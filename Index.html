@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ROCÍO AGROCONTROL</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'primary':                   '#001f12',
+            'primary-container':         '#003622',
+            'secondary':                 '#006c4a',
+            'secondary-fixed':           '#6ffbbe',
+            'surface':                   '#efffdd',
+            'surface-container':         '#e3f3d2',
+            'surface-container-low':     '#e9f9d8',
+            'surface-container-high':    '#deedcd',
+            'surface-container-highest': '#d8e8c7',
+            'surface-dim':               '#cfdfbf',
+            'on-surface':                '#131f0b',
+            'on-surface-variant':        '#414943',
+            'outline':                   '#717973',
+            'outline-variant':           '#c0c9c1',
+            'error':                     '#ba1a1a',
+            'error-container':           '#ffdad6'
+          },
+          fontFamily: {
+            'headline': ['Manrope'],
+            'body':     ['Inter'],
+            'label':    ['Poppins']
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-body">
+
+  <div id="app-root"></div>
+
+  <!-- 1. Estilos globales -->
+  <?!= include('Styles'); ?>
+
+  <!-- 2. Vistas -->
+  <?!= include('Dashboard'); ?>
+  <?!= include('Activity'); ?>
+  <?!= include('Resources'); ?>
+  <?!= include('Campos'); ?>
+  <?!= include('Campanias'); ?>
+  <?!= include('CampaniasDetail'); ?>
+
+  <!-- 3. Formulario modal -->
+  <?!= include('Form'); ?>
+
+  <!-- 4. Shell ANTES que Login -->
+  <?!= include('Shell'); ?>
+
+  <!-- 5. Login AL ÚLTIMO — ya puede usar runServer y showAppShell -->
+  <?!= include('Login'); ?>
+
+</body>
+</html>

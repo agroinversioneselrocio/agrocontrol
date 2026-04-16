@@ -1,0 +1,589 @@
+<script>
+(function () {
+
+  // ── Estado interno ──────────────────────────────────────────
+  var _camposData      = [];
+  var _camposFiltrados = [];
+  var _currentId       = null;
+  var _detailMode      = 'view';
+  var _newStatus       = 'activo';
+  var _detailStatus    = 'activo';
+  var _toastTimer      = null;
+
+  // ══════════════════════════════════════════════════════════
+  // PUNTO DE ENTRADA — llamado por Shell
+  // ══════════════════════════════════════════════════════════
+  window.renderCamposView = function(container) {
+    container.innerHTML = _buildHTML();
+    _injectStyles();
+    _loadCampos();
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // HTML ESTÁTICO
+  // ══════════════════════════════════════════════════════════
+  function _buildHTML() {
+    return `
+    <div class="p-6 md:p-8 space-y-6">
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 class="font-headline font-extrabold text-2xl text-primary tracking-tight">Campos</h1>
+          <p class="text-on-surface-variant text-sm mt-0.5">Gestión de lotes y áreas de cultivo</p>
+        </div>
+        <button onclick="camposOpenNew()"
+          class="inline-flex items-center gap-2 bg-primary-container text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md hover:scale-[1.02] active:scale-95 transition-all">
+          <span class="material-symbols-outlined text-base">add</span>
+          Nuevo Campo
+        </button>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        ${_statCard('stat-total',     'grid_view',   'Total',      'campos registrados')}
+        ${_statCard('stat-hectareas', 'straighten',  'Superficie', 'hectáreas totales')}
+        ${_statCard('stat-activos',   'check_circle','Activos',    'en producción')}
+        ${_statCard('stat-inactivos', 'pending',     'Inactivos',  'fuera de producción')}
+      </div>
+
+      <!-- Tabla -->
+      <div class="bg-white rounded-xl shadow-sm border border-outline-variant/20 overflow-hidden">
+
+        <!-- Toolbar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-outline-variant/15">
+          <h2 class="font-headline font-bold text-base text-primary">Lista de Campos</h2>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-base">search</span>
+            <input type="text" id="campos-search" placeholder="Buscar campo..."
+              oninput="camposFilterTable(this.value)"
+              class="pl-9 pr-4 py-2 bg-surface-container rounded-lg text-sm text-on-surface placeholder:text-outline border-none outline-none focus:ring-2 focus:ring-primary/20 w-56 transition-all"/>
+          </div>
+        </div>
+
+        <!-- Tabla -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-surface-container text-outline text-[11px] font-bold uppercase tracking-widest">
+                <th class="text-left px-5 py-3">ID</th>
+                <th class="text-left px-5 py-3">Nombre</th>
+                <th class="text-left px-5 py-3">Ubicación</th>
+                <th class="text-left px-5 py-3">Cultivo</th>
+                <th class="text-left px-5 py-3">Propietario</th>
+                <th class="text-right px-5 py-3">Hectáreas</th>
+                <th class="text-center px-5 py-3">Estado</th>
+                <th class="text-center px-5 py-3">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="campos-tbody" class="divide-y divide-outline-variant/15">
+              <tr><td colspan="8" class="px-5 py-8 text-center text-on-surface-variant text-sm">
+                <div class="flex items-center justify-center gap-2">
+                  <div style="width:20px;height:20px;border:2px solid #e3f3d2;border-top-color:#003622;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                  Cargando campos...
+                </div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty state -->
+        <div id="campos-empty-state" style="display:none;"
+          class="flex flex-col items-center justify-center py-16 text-center">
+          <span class="material-symbols-outlined text-5xl text-outline-variant mb-3">search_off</span>
+          <p class="font-bold text-on-surface-variant">Sin resultados</p>
+          <p class="text-xs text-outline mt-1">No se encontraron campos con ese criterio</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL DETALLE / EDITAR ─────────────────────────── -->
+    <div id="campos-modal-detail" class="campos-modal-overlay" onclick="camposHandleOverlay(event,'campos-modal-detail')">
+      <div class="campos-modal-box bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+        <div class="bg-primary-container px-7 py-6 flex-shrink-0">
+          <button onclick="camposCloseModal('campos-modal-detail')"
+            class="absolute top-4 right-4 text-white/60 hover:text-white transition-colors">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <h2 class="font-headline font-extrabold text-2xl text-white tracking-tight" id="cd-title">Detalle de Campo</h2>
+          <p class="text-white/70 text-xs mt-1" id="cd-subtitle">—</p>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-6 bg-surface space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${_detailField('cd-nombre',       'Nombre del Campo', 'text')}
+            ${_detailField('cd-ubicacion',    'Ubicación',        'text')}
+            ${_detailField('cd-hectareas',    'Hectáreas',        'number')}
+            ${_detailField('cd-tipo-cultivo', 'Tipo de Cultivo',  'text')}
+            ${_detailField('cd-propietario',  'Propietario',      'text')}
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Estado</label>
+              <div class="flex gap-2">
+                <button type="button" id="cd-btn-activo"   onclick="camposSetDetailStatus('activo')"   disabled class="campos-status-btn">
+                  <span class="w-2 h-2 rounded-full bg-secondary"></span> Activo
+                </button>
+                <button type="button" id="cd-btn-inactivo" onclick="camposSetDetailStatus('inactivo')" disabled class="campos-status-btn">
+                  Inactivo
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 pt-2 border-t border-outline-variant/15">
+            ${_detailField('cd-fecha-creacion',      'Fecha Creación',        'text', true)}
+            ${_detailField('cd-fecha-actualizacion', 'Última Actualización',  'text', true)}
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-outline-variant/15 flex items-center justify-between gap-3 bg-surface flex-shrink-0">
+          <button onclick="camposConfirmDelete()"
+            class="flex items-center gap-2 text-error font-bold text-sm hover:bg-error-container/20 px-4 py-2 rounded-lg transition-colors">
+            <span class="material-symbols-outlined text-lg">delete</span> Eliminar
+          </button>
+          <div class="flex items-center gap-3">
+            <button id="cd-btn-cancel"  onclick="camposHandleDetailCancel()"
+              class="px-5 py-2.5 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors">Cancelar</button>
+            <button id="cd-btn-primary" onclick="camposHandleDetailPrimary()"
+              class="px-7 py-2.5 bg-primary-container text-white rounded-xl font-bold text-sm shadow-md hover:scale-[1.02] active:scale-95 transition-all">Editar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL NUEVO CAMPO ──────────────────────────────── -->
+    <div id="campos-modal-new" class="campos-modal-overlay" onclick="camposHandleOverlay(event,'campos-modal-new')">
+      <div class="campos-modal-box bg-white w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+        <div class="bg-primary-container px-7 py-6 flex-shrink-0">
+          <button onclick="camposCloseModal('campos-modal-new')"
+            class="absolute top-4 right-4 text-white/60 hover:text-white transition-colors">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <h2 class="font-headline font-extrabold text-2xl text-white tracking-tight">Nuevo Campo</h2>
+          <p class="text-white/70 text-xs mt-1">Complete la información para registrar el campo.</p>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-6 bg-surface space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Nombre *</label>
+              <input id="cn-nombre" type="text" placeholder="Ej. Parcela Norte" class="campos-field-input"/>
+            </div>
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Ubicación</label>
+              <input id="cn-ubicacion" type="text" placeholder="Ej. Sector A, Km 12" class="campos-field-input"/>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Hectáreas</label>
+              <input id="cn-hectareas" type="number" step="0.01" min="0" placeholder="0.00" class="campos-field-input"/>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Tipo de Cultivo</label>
+              <input id="cn-tipo-cultivo" type="text" placeholder="Ej. Maíz, Arroz..." class="campos-field-input"/>
+            </div>
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Propietario</label>
+              <input id="cn-propietario" type="text" placeholder="Nombre del propietario" class="campos-field-input"/>
+            </div>
+            <div class="space-y-2 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Estado Inicial</label>
+              <div class="flex gap-2">
+                <button type="button" id="cn-btn-activo"   onclick="camposSetNewStatus('activo')"   class="campos-status-btn campos-status-active">
+                  <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span> Activo
+                </button>
+                <button type="button" id="cn-btn-inactivo" onclick="camposSetNewStatus('inactivo')" class="campos-status-btn">
+                  Inactivo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-outline-variant/15 flex items-center justify-end gap-3 bg-surface flex-shrink-0">
+          <button onclick="camposCloseModal('campos-modal-new')"
+            class="px-5 py-2.5 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors">Cancelar</button>
+          <button id="cn-btn-save" onclick="camposSaveNew()"
+            class="px-8 py-2.5 bg-primary-container text-white rounded-xl font-bold text-sm shadow-md hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2">
+            <span class="material-symbols-outlined text-base">save</span> Guardar Campo
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TOAST ──────────────────────────────────────────── -->
+    <div id="campos-toast"
+      style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);z-index:200;
+             opacity:0;pointer-events:none;transition:all 0.3s;
+             background:#003622;color:white;padding:12px 20px;border-radius:12px;
+             box-shadow:0 8px 24px rgba(0,0,0,0.18);display:flex;align-items:center;gap:8px;
+             font-family:Poppins,sans-serif;font-size:14px;font-weight:600;white-space:nowrap;">
+      <span class="material-symbols-outlined" id="campos-toast-icon" style="font-size:18px;">check_circle</span>
+      <span id="campos-toast-msg">Guardado</span>
+    </div>
+    `;
+  }
+
+  // ── Helpers de construcción HTML ────────────────────────────
+  function _statCard(id, icon, label, sub) {
+    return `
+    <div class="bg-white rounded-xl p-5 shadow-sm border border-outline-variant/20">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="material-symbols-outlined text-secondary text-xl">${icon}</span>
+        <span class="text-xs font-bold uppercase tracking-widest text-outline">${label}</span>
+      </div>
+      <p class="font-headline font-extrabold text-3xl text-primary" id="${id}">—</p>
+      <p class="text-xs text-on-surface-variant mt-1">${sub}</p>
+    </div>`;
+  }
+
+  function _detailField(id, label, type, alwaysReadonly) {
+    var ro = alwaysReadonly ? 'readonly' : '';
+    var step = type === 'number' ? 'step="0.01"' : '';
+    return `
+    <div class="space-y-1">
+      <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">${label}</label>
+      <input id="${id}" type="${type}" ${step} ${ro} class="campos-field-input"/>
+    </div>`;
+  }
+
+  // ── Inyección de estilos (una sola vez) ─────────────────────
+  function _injectStyles() {
+    if (document.getElementById('campos-styles')) return;
+    var s = document.createElement('style');
+    s.id = 'campos-styles';
+    s.textContent = `
+      .campos-modal-overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(19,31,11,0.35); backdrop-filter: blur(4px);
+        z-index: 50; align-items: center; justify-content: center; padding: 1rem 1.5rem;
+      }
+      .campos-modal-overlay.active { display: flex; }
+      .campos-modal-box { animation: camposModalIn 0.22s ease; }
+      @keyframes camposModalIn {
+        from { opacity:0; transform:scale(0.96) translateY(8px); }
+        to   { opacity:1; transform:scale(1) translateY(0); }
+      }
+      .campos-field-input {
+        width:100%; background:#e9f9d8; border:none; border-radius:0.5rem;
+        padding:0.75rem 1rem; font-family:Poppins,sans-serif; font-size:0.875rem;
+        color:#131f0b; outline:none; box-sizing:border-box; transition:box-shadow 0.2s;
+      }
+      .campos-field-input:focus { box-shadow:0 0 0 2px #bbeed0; }
+      .campos-field-input[readonly] { cursor:default; opacity:0.85; }
+      .campos-field-input[readonly]:focus { box-shadow:none; }
+      .campos-status-btn {
+        flex:1; display:flex; align-items:center; justify-content:center; gap:0.4rem;
+        padding:0.6rem 0.5rem; border-radius:0.5rem; font-family:Poppins,sans-serif;
+        font-size:0.75rem; font-weight:700; border:2px solid transparent; cursor:pointer;
+        transition:all 0.2s; background:#e9f9d8; color:#414943;
+      }
+      .campos-status-active { background:#6ffbbe !important; color:#002114 !important; border-color:#4fdea4 !important; }
+      .campos-status-btn:disabled { cursor:default; }
+    `;
+    document.head.appendChild(s);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // DATOS
+  // ══════════════════════════════════════════════════════════
+  function _loadCampos() {
+    return runServer('getCampos')
+      .then(function(resp) {
+        _camposData      = (resp && resp.data) ? resp.data : [];
+        _camposFiltrados = _camposData.slice();
+        _updateStats();
+        _renderTable(_camposFiltrados);
+      })
+      .catch(function(err) {
+        var tbody = document.getElementById('campos-tbody');
+        if (tbody) {
+          tbody.innerHTML =
+            '<tr><td colspan="8" class="px-5 py-8 text-center text-error text-sm">' +
+            'Error al cargar: ' + escapeHtml(err && err.message ? err.message : String(err)) +
+            ' <button onclick="renderCamposView(document.getElementById(\'page-content\'))" ' +
+            'class="ml-3 underline text-primary font-bold">Reintentar</button>' +
+            '</td></tr>';
+        }
+      });
+  }
+
+  function _updateStats() {
+    var total     = _camposData.length;
+    var activos   = _camposData.filter(function(c){ return (c.estado||'').toLowerCase() === 'activo'; }).length;
+    var inactivos = total - activos;
+    var hectareas = _camposData.reduce(function(s,c){ return s + (parseFloat(c.hectareas)||0); }, 0);
+    _setText('stat-total',     total);
+    _setText('stat-hectareas', hectareas.toFixed(1) + ' ha');
+    _setText('stat-activos',   activos);
+    _setText('stat-inactivos', inactivos);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // TABLA
+  // ══════════════════════════════════════════════════════════
+  function _renderTable(data) {
+    var tbody = document.getElementById('campos-tbody');
+    var empty = document.getElementById('campos-empty-state');
+    if (!tbody) return;
+
+    if (!data.length) {
+      tbody.innerHTML = '';
+      if (empty) empty.style.display = 'flex';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    tbody.innerHTML = data.map(function(c) {
+      var isActivo = (c.estado||'').toLowerCase() === 'activo';
+      var chip = isActivo
+        ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:9999px;background:#dcfce7;color:#166534;font-size:11px;font-weight:600;font-family:Poppins,sans-serif;"><span style="width:6px;height:6px;border-radius:50%;background:#16a34a;"></span>Activo</span>'
+        : '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:9999px;background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:600;font-family:Poppins,sans-serif;"><span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;"></span>Inactivo</span>';
+
+      return '<tr style="transition:background 0.15s;" onmouseover="this.style.background=\'#fafff7\'" onmouseout="this.style.background=\'\'">' +
+        '<td class="px-5 py-3.5 text-xs text-outline font-mono">'          + escapeHtml(c.campo_id)                           + '</td>' +
+        '<td class="px-5 py-3.5 font-semibold text-on-surface">'           + escapeHtml(c.nombre       || '—')                + '</td>' +
+        '<td class="px-5 py-3.5 text-on-surface-variant">'                 + escapeHtml(c.ubicacion    || '—')                + '</td>' +
+        '<td class="px-5 py-3.5 text-on-surface-variant">'                 + escapeHtml(c.tipo_cultivo || '—')                + '</td>' +
+        '<td class="px-5 py-3.5 text-on-surface-variant">'                 + escapeHtml(c.propietario  || '—')                + '</td>' +
+        '<td class="px-5 py-3.5 text-right font-semibold text-on-surface">'+ escapeHtml(c.hectareas != null ? String(c.hectareas) : '—') + '</td>' +
+        '<td class="px-5 py-3.5 text-center">'                             + chip                                             + '</td>' +
+        '<td class="px-5 py-3.5">' +
+          '<div class="flex items-center justify-center gap-1">' +
+            '<button onclick="camposOpenDetail(\'' + escapeHtml(c.campo_id) + '\')" title="Ver" ' +
+              'style="padding:6px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#717973;transition:all 0.2s;" ' +
+              'onmouseover="this.style.color=\'#006c4a\';this.style.background=\'#f0fdf4\'" onmouseout="this.style.color=\'#717973\';this.style.background=\'transparent\'">' +
+              '<span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>' +
+            '<button onclick="camposOpenEdit(\'' + escapeHtml(c.campo_id) + '\')" title="Editar" ' +
+              'style="padding:6px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#717973;transition:all 0.2s;" ' +
+              'onmouseover="this.style.color=\'#006c4a\';this.style.background=\'#f0fdf4\'" onmouseout="this.style.color=\'#717973\';this.style.background=\'transparent\'">' +
+              '<span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>' +
+            '<button onclick="camposDeleteFromRow(\'' + escapeHtml(c.campo_id) + '\')" title="Eliminar" ' +
+              'style="padding:6px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#717973;transition:all 0.2s;" ' +
+              'onmouseover="this.style.color=\'#ba1a1a\';this.style.background=\'#fff1f2\'" onmouseout="this.style.color=\'#717973\';this.style.background=\'transparent\'">' +
+              '<span class="material-symbols-outlined" style="font-size:18px;">delete</span></button>' +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  window.camposFilterTable = function(q) {
+    var query = (q||'').toLowerCase().trim();
+    _camposFiltrados = !query ? _camposData.slice() : _camposData.filter(function(c) {
+      return [c.nombre, c.ubicacion, c.tipo_cultivo, c.propietario, c.campo_id]
+        .map(function(v){ return (v||'').toLowerCase(); }).join(' ').includes(query);
+    });
+    _renderTable(_camposFiltrados);
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // MODAL DETALLE
+  // ══════════════════════════════════════════════════════════
+  window.camposOpenDetail = function(id) {
+    var c = _camposData.find(function(x){ return x.campo_id == id; });
+    if (!c) return;
+    _currentId = id; _detailMode = 'view'; _detailStatus = (c.estado||'activo').toLowerCase();
+    _populateDetail(c); _setDetailReadonly(true);
+    _setText('cd-btn-primary', 'Editar'); _setText('cd-btn-cancel', 'Cerrar');
+    camposOpenModal('campos-modal-detail');
+  };
+
+  window.camposOpenEdit = function(id) {
+    var c = _camposData.find(function(x){ return x.campo_id == id; });
+    if (!c) return;
+    _currentId = id; _detailMode = 'edit'; _detailStatus = (c.estado||'activo').toLowerCase();
+    _populateDetail(c); _setDetailReadonly(false);
+    _setText('cd-btn-primary', 'Guardar Cambios'); _setText('cd-btn-cancel', 'Cancelar');
+    camposOpenModal('campos-modal-detail');
+  };
+
+  function _populateDetail(c) {
+    _setText('cd-title',    c.nombre || '—');
+    _setText('cd-subtitle', 'ID: ' + c.campo_id);
+    _setVal('cd-nombre',              c.nombre);
+    _setVal('cd-ubicacion',           c.ubicacion);
+    _setVal('cd-hectareas',           c.hectareas);
+    _setVal('cd-tipo-cultivo',        c.tipo_cultivo);
+    _setVal('cd-propietario',         c.propietario);
+    _setVal('cd-fecha-creacion',      _formatDate(c.fecha_creacion));
+    _setVal('cd-fecha-actualizacion', _formatDate(c.fecha_actualizacion));
+    _updateDetailStatusBtns();
+  }
+
+  function _setDetailReadonly(ro) {
+    ['cd-nombre','cd-ubicacion','cd-hectareas','cd-tipo-cultivo','cd-propietario'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (ro) el.setAttribute('readonly',''); else el.removeAttribute('readonly');
+    });
+    var bA = document.getElementById('cd-btn-activo');
+    var bI = document.getElementById('cd-btn-inactivo');
+    if (bA) bA.disabled = ro;
+    if (bI) bI.disabled = ro;
+  }
+
+  window.camposSetDetailStatus = function(val) {
+    if (_detailMode === 'view') return;
+    _detailStatus = val; _updateDetailStatusBtns();
+  };
+
+  function _updateDetailStatusBtns() {
+    var bA = document.getElementById('cd-btn-activo');
+    var bI = document.getElementById('cd-btn-inactivo');
+    if (!bA || !bI) return;
+    if (_detailStatus === 'activo') {
+      bA.classList.add('campos-status-active');    bI.classList.remove('campos-status-active');
+    } else {
+      bI.classList.add('campos-status-active');    bA.classList.remove('campos-status-active');
+    }
+  }
+
+  window.camposHandleDetailPrimary = function() {
+    if (_detailMode === 'view') {
+      _detailMode = 'edit'; _setDetailReadonly(false);
+      _setText('cd-btn-primary','Guardar Cambios'); _setText('cd-btn-cancel','Cancelar');
+    } else { _saveDetail(); }
+  };
+
+  window.camposHandleDetailCancel = function() {
+    if (_detailMode === 'edit') {
+      var c = _camposData.find(function(x){ return x.campo_id == _currentId; });
+      if (c) {
+        _detailMode = 'view'; _populateDetail(c); _setDetailReadonly(true);
+        _setText('cd-btn-primary','Editar'); _setText('cd-btn-cancel','Cerrar');
+      }
+    } else { camposCloseModal('campos-modal-detail'); }
+  };
+
+  function _saveDetail() {
+    var btn = document.getElementById('cd-btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    var payload = {
+      campo_id:     _currentId,
+      nombre:       _getVal('cd-nombre'),
+      ubicacion:    _getVal('cd-ubicacion'),
+      hectareas:    parseFloat(_getVal('cd-hectareas')) || 0,
+      tipo_cultivo: _getVal('cd-tipo-cultivo'),
+      propietario:  _getVal('cd-propietario'),
+      estado:       _detailStatus
+    };
+    runServer('updateCampo', payload)
+      .then(function() {
+        camposCloseModal('campos-modal-detail');
+        _showToast('check_circle','Campo actualizado correctamente');
+        return _loadCampos();
+      })
+      .catch(function(err) { _showToast('error','Error: ' + (err&&err.message?err.message:err)); })
+      .finally(function() { if (btn) { btn.disabled=false; btn.textContent='Guardar Cambios'; } });
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ELIMINAR
+  // ══════════════════════════════════════════════════════════
+  window.camposConfirmDelete = function() { camposDeleteFromRow(_currentId); };
+
+  window.camposDeleteFromRow = function(id) {
+    if (!confirm('¿Eliminar este campo? Esta acción no se puede deshacer.')) return;
+    runServer('deleteCampo', { campo_id: id })
+      .then(function() {
+        camposCloseModal('campos-modal-detail');
+        _showToast('delete','Campo eliminado');
+        return _loadCampos();
+      })
+      .catch(function(err) { _showToast('error','Error al eliminar: '+(err&&err.message?err.message:err)); });
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // NUEVO CAMPO
+  // ══════════════════════════════════════════════════════════
+  window.camposOpenNew = function() {
+    ['cn-nombre','cn-ubicacion','cn-hectareas','cn-tipo-cultivo','cn-propietario']
+      .forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    _newStatus = 'activo'; _updateNewStatusBtns();
+    camposOpenModal('campos-modal-new');
+  };
+
+  window.camposSetNewStatus = function(val) { _newStatus=val; _updateNewStatusBtns(); };
+
+  function _updateNewStatusBtns() {
+    var bA = document.getElementById('cn-btn-activo');
+    var bI = document.getElementById('cn-btn-inactivo');
+    if (!bA||!bI) return;
+    if (_newStatus==='activo') {
+      bA.classList.add('campos-status-active');    bI.classList.remove('campos-status-active');
+    } else {
+      bI.classList.add('campos-status-active');    bA.classList.remove('campos-status-active');
+    }
+  }
+
+  window.camposSaveNew = function() {
+    var nombre = _getVal('cn-nombre');
+    if (!nombre.trim()) { _showToast('error','El nombre del campo es obligatorio'); return; }
+    var btn = document.getElementById('cn-btn-save');
+    if (btn) { btn.disabled=true; btn.textContent='Guardando...'; }
+    var payload = {
+      nombre:       nombre.trim(),
+      ubicacion:    _getVal('cn-ubicacion'),
+      hectareas:    parseFloat(_getVal('cn-hectareas'))||0,
+      tipo_cultivo: _getVal('cn-tipo-cultivo'),
+      propietario:  _getVal('cn-propietario'),
+      estado:       _newStatus
+    };
+    runServer('createCampo', payload)
+      .then(function() {
+        camposCloseModal('campos-modal-new');
+        _showToast('check_circle','Campo creado correctamente');
+        return _loadCampos();
+      })
+      .catch(function(err) { _showToast('error','Error: '+(err&&err.message?err.message:err)); })
+      .finally(function() {
+        if (btn) {
+          btn.disabled=false;
+          btn.innerHTML='<span class="material-symbols-outlined" style="font-size:16px;">save</span> Guardar Campo';
+        }
+      });
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // HELPERS MODAL / TOAST / DOM
+  // ══════════════════════════════════════════════════════════
+  window.camposOpenModal  = function(id) {
+    var el=document.getElementById(id);
+    if(el){ el.classList.add('active'); document.body.style.overflow='hidden'; }
+  };
+  window.camposCloseModal = function(id) {
+    var el=document.getElementById(id);
+    if(el){ el.classList.remove('active'); document.body.style.overflow=''; }
+  };
+  window.camposHandleOverlay = function(e,id) {
+    if(e.target===document.getElementById(id)) camposCloseModal(id);
+  };
+
+  function _showToast(icon, msg) {
+    var t  = document.getElementById('campos-toast');
+    var m  = document.getElementById('campos-toast-msg');
+    var ic = document.getElementById('campos-toast-icon');
+    if (!t) return;
+    if (m)  m.textContent  = msg;
+    if (ic) ic.textContent = icon;
+    t.style.opacity       = '1';
+    t.style.transform     = 'translateX(-50%) translateY(0)';
+    t.style.pointerEvents = 'auto';
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function() {
+      t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(8px)'; t.style.pointerEvents='none';
+    }, 3000);
+  }
+
+  function _setText(id, val) { var el=document.getElementById(id); if(el) el.textContent = val!=null?val:'—'; }
+  function _setVal(id, val)  { var el=document.getElementById(id); if(el) el.value = val!=null?val:''; }
+  function _getVal(id)       { var el=document.getElementById(id); return el?el.value:''; }
+  function _formatDate(val) {
+    if (!val) return '—';
+    var d = new Date(val);
+    if (isNaN(d)) return String(val);
+    return d.toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'});
+  }
+
+  window.onGlobalSearch_campos = function(q) {
+    var inp = document.getElementById('campos-search');
+    if (inp) inp.value = q;
+    camposFilterTable(q);
+  };
+
+})();
+</script>

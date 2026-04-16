@@ -1,0 +1,437 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&family=Poppins:wght@400;500&display=swap');
+
+  :root {
+    --color-primary: #003622;
+    --color-accent: #4ade80;
+    --color-bg-card: #dce8cc;
+    --color-text-dark: #1a2e1a;
+    --color-text-muted: #6b7280;
+    --color-white: #ffffff;
+  }
+
+  #login-screen {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    font-family: 'Inter', sans-serif;
+    /* Imagen de campo al amanecer con overlay de oscurecimiento */
+    background: linear-gradient(rgba(0, 50, 20, 0.4), rgba(0, 50, 20, 0.4)), 
+                url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=2071&auto=format&fit=crop') no-repeat center center;
+    background-size: cover;
+    background-attachment: fixed;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .login-container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: 100%;
+    max-width: 900px;
+    margin: auto;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+
+  .branding-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: var(--color-white);
+  }
+
+  .branding-tag {
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    color: rgba(255,255,255,0.85);
+  }
+
+  .branding-title {
+    font-family: 'Manrope', sans-serif;
+    font-size: 56px;
+    line-height: 1.1;
+    font-weight: 800;
+    margin: 0 0 25px 0;
+  }
+
+  .branding-title .highlight {
+    color: var(--color-accent);
+    display: block;
+  }
+
+  .quote-box {
+    background: rgba(0, 54, 34, 0.65);
+    backdrop-filter: blur(12px);
+    padding: 24px;
+    border-radius: 20px;
+    max-width: 340px;
+    border-left: 5px solid var(--color-accent);
+    color: var(--color-white);
+  }
+
+  .quote-text {
+    font-style: italic;
+    font-size: 16px;
+    line-height: 1.4;
+    margin-bottom: 12px;
+    opacity: 0.9;
+  }
+
+  .quote-footer {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .quote-footer::before {
+    content: '';
+    width: 25px;
+    height: 2px;
+    background: var(--color-accent);
+  }
+
+  .auth-section {
+    width: 420px;
+    flex-shrink: 0;
+  }
+
+  .login-card {
+    background: var(--color-bg-card);
+    width: 100%;
+    padding: 40px;
+    border-radius: 28px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  }
+
+  .card-header {
+    margin-bottom: 28px;
+  }
+
+  .card-title {
+    font-family: 'Manrope', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-text-dark);
+    margin-bottom: 6px;
+  }
+
+  .card-subtitle {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--color-text-dark);
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+    display: block;
+  }
+
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .modern-input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--color-white);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--color-text-dark);
+    transition: all 0.2s ease;
+    appearance: none;
+  }
+
+  .modern-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 54, 34, 0.1);
+  }
+
+  .select-wrapper {
+    position: relative;
+  }
+  .select-wrapper::after {
+    content: 'expand_more';
+    font-family: 'Material Symbols Outlined';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--color-text-muted);
+    font-size: 18px;
+  }
+
+  .password-toggle {
+    position: absolute;
+    right: 12px;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    user-select: none;
+    transition: color 0.2s;
+  }
+  .password-toggle:hover {
+    color: var(--color-primary);
+  }
+
+  .form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    font-size: 12px;
+  }
+
+  .remember-me {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-dark);
+    cursor: pointer;
+  }
+
+  .remember-me input {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--color-primary);
+  }
+
+  .forgot-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .forgot-link:hover { opacity: 0.7; }
+
+  .btn-login {
+    width: 100%;
+    background: var(--color-primary);
+    color: var(--color-white);
+    padding: 14px;
+    border-radius: 10px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+  }
+
+  .btn-login:hover {
+    background: #004d31;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+  }
+
+  .card-footer {
+    margin-top: 30px;
+    text-align: center;
+    font-size: 9px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .login-error {
+    background: #fee2e2;
+    color: #b91c1c;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 16px;
+    display: none;
+    text-align: center;
+  }
+  .login-error.show { display: block; }
+
+  @media (max-width: 768px) {
+    .login-container {
+      flex-direction: column;
+      padding: 30px 20px;
+    }
+    .branding-section {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .branding-title { font-size: 42px; }
+    .quote-box { display: none; }
+    .auth-section { width: 100%; }
+  }
+</style>
+
+<div id="login-screen">
+  <div class="login-container">
+    
+    <div class="branding-section">
+      <div class="branding-tag">Sistemas de Precisión</div>
+      <h1 class="branding-title">
+        Rocío<br>
+        <span class="highlight">Agrocontrol</span>
+      </h1>
+      
+      <div class="quote-box">
+        <div class="quote-text">"La precisión del dato se encuentra con la armonía del campo."</div>
+        <div class="quote-footer">Módulo de Gestión 2024</div>
+      </div>
+    </div>
+
+    <div class="auth-section">
+      <div class="login-card">
+        <div class="card-header">
+          <h2 class="card-title">Bienvenido</h2>
+          <p class="card-subtitle">Ingrese sus credenciales para acceder al sistema.</p>
+        </div>
+
+        <div id="login-error" class="login-error"></div>
+
+        <form id="login-form">
+          <div class="form-group">
+            <label class="form-label">Usuario del Sistema</label>
+            <div class="select-wrapper">
+              <select id="login-username" class="modern-input" required>
+                <option value="">Seleccione un operador...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Contraseña</label>
+            <div class="input-wrapper">
+              <input type="password" id="login-password" class="modern-input" placeholder="••••••••" required>
+              <span class="material-symbols-outlined password-toggle" id="toggle-password">visibility_off</span>
+            </div>
+          </div>
+
+          <div class="form-options">
+            <label class="remember-me">
+              <input type="checkbox"> Mantener sesión
+            </label>
+            <a href="#" class="forgot-link">¿Olvidó su contraseña?</a>
+          </div>
+
+          <button type="submit" class="btn-login">
+            INICIAR SESIÓN <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
+          </button>
+        </form>
+
+        <div class="card-footer">
+          © 2024 ROCÍO AGROCONTROL • VERSIÓN 2.0.0
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+document.getElementById('toggle-password').addEventListener('click', function() {
+  const input = document.getElementById('login-password');
+  if (input.type === 'password') {
+    input.type = 'text';
+    this.textContent = 'visibility';
+  } else {
+    input.type = 'password';
+    this.textContent = 'visibility_off';
+  }
+});
+
+document.addEventListener('DOMContentLoaded', cargarUsuariosLogin);
+
+function cargarUsuariosLogin() {
+  var select = document.getElementById('login-username');
+  google.script.run
+    .withSuccessHandler(function(response) {
+      select.innerHTML = '<option value="">Seleccione un operador...</option>';
+      if (response.ok && response.data && response.data.length > 0) {
+        response.data.forEach(function(u) {
+          var opt = document.createElement('option');
+          opt.value = u.username;
+          opt.textContent = u.nombre + ' (' + u.username + ')';
+          select.appendChild(opt);
+        });
+      } else {
+        select.innerHTML = '<option value="">Sin usuarios disponibles</option>';
+      }
+    })
+    .withFailureHandler(function(err) {
+      select.innerHTML = '<option value="">Error al cargar usuarios</option>';
+    })
+    .webAppListUsuariosActivos();
+}
+
+function initLogin() {
+  var form = document.getElementById('login-form');
+  var error = document.getElementById('login-error');
+  
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    error.classList.remove('show');
+    
+    var username = document.getElementById('login-username').value;
+    var password = document.getElementById('login-password').value;
+    
+    if (!username || !password) {
+      error.textContent = 'Usuario y contraseña son requeridos.';
+      error.classList.add('show');
+      return;
+    }
+    
+    try {
+      var result = await runServer('webAppLogin', { username: username, password: password, ip: 'webapp' });
+      
+      if (result.ok) {
+        sessionStorage.setItem('token', result.token);
+        sessionStorage.setItem('user', JSON.stringify(result.usuario));
+        showAppShell();
+      } else {
+        error.textContent = result.message || 'Error al iniciar sesión';
+        error.classList.add('show');
+      }
+    } catch (e) {
+      error.textContent = 'Error de conexión. Intenta nuevamente.';
+      error.classList.add('show');
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initLogin);
+</script>

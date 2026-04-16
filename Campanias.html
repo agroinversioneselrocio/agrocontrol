@@ -1,0 +1,341 @@
+<script>
+(function () {
+
+  window._campaniasData      = window._campaniasData || [];
+  window._campaniasFiltradas = window._campaniasFiltradas || [];
+  window._currentId          = window._currentId || null;
+  window._detailMode         = window._detailMode || 'view';
+  window._toastTimer         = window._toastTimer || null;
+
+  window.renderCampaniasView = function(container) {
+    if (!container) return;
+    container.innerHTML = _buildHTML();
+    _injectStyles();
+    return window.campaniasLoad();
+  };
+
+  function _buildHTML() {
+    return `
+    <div class="p-6 md:p-8 space-y-6">
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 class="font-headline font-extrabold text-2xl text-primary tracking-tight">Campañas</h1>
+          <p class="text-on-surface-variant text-sm mt-0.5">Gestión de ciclos productivos globales</p>
+        </div>
+        <button onclick="campaniasOpenNew()"
+          class="inline-flex items-center gap-2 bg-primary-container text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md hover:scale-[1.02] active:scale-95 transition-all">
+          <span class="material-symbols-outlined text-base">add</span>
+          Nueva Campaña
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        ${_statCard('cpn-stat-total',       'calendar_today', 'Total',        'campañas registradas')}
+        ${_statCard('cpn-stat-progreso',    'play_circle',    'En Progreso',  'activas ahora')}
+        ${_statCard('cpn-stat-planificada', 'schedule',       'Planificadas', 'por iniciar')}
+        ${_statCard('cpn-stat-presupuesto', 'payments',       'Presupuesto',  'total estimado')}
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-outline-variant/20 overflow-hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-outline-variant/15">
+          <h2 class="font-headline font-bold text-base text-primary">Lista de Campañas</h2>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-base">search</span>
+            <input type="text" id="campanias-search" placeholder="Buscar campaña..."
+              oninput="campaniasFilterTable(this.value)"
+              class="pl-9 pr-4 py-2 bg-surface-container rounded-lg text-sm text-on-surface placeholder:text-outline border-none outline-none focus:ring-2 focus:ring-primary/20 w-56 transition-all"/>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-surface-container text-outline text-[11px] font-bold uppercase tracking-widest">
+                <th class="text-left px-5 py-3">ID</th>
+                <th class="text-left px-5 py-3">Nombre</th>
+                <th class="text-left px-5 py-3">Inicio</th>
+                <th class="text-left px-5 py-3">Fin</th>
+                <th class="text-right px-5 py-3">Presupuesto</th>
+                <th class="text-right px-5 py-3">Utilidad</th>
+                <th class="text-center px-5 py-3">Estado</th>
+                <th class="text-center px-5 py-3">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="campanias-tbody" class="divide-y divide-outline-variant/15">
+              <tr>
+                <td colspan="8" class="px-5 py-8 text-center text-on-surface-variant text-sm">
+                  <div class="flex items-center justify-center gap-2">
+                    <div style="width:20px;height:20px;border:2px solid #e3f3d2;border-top-color:#003622;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                    Cargando campañas...
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="campanias-empty-state" style="display:none;"
+          class="flex flex-col items-center justify-center py-16 text-center">
+          <span class="material-symbols-outlined text-5xl text-outline-variant mb-3">search_off</span>
+          <p class="font-bold text-on-surface-variant">Sin resultados</p>
+          <p class="text-xs text-outline mt-1">No se encontraron campañas con ese criterio</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="cpn-toast"
+      style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);z-index:200;
+             opacity:0;pointer-events:none;transition:all 0.3s;
+             background:#003622;color:white;padding:12px 20px;border-radius:12px;
+             box-shadow:0 8px 24px rgba(0,0,0,0.18);display:flex;align-items:center;gap:8px;
+             font-family:Poppins,sans-serif;font-size:14px;font-weight:600;white-space:nowrap;">
+      <span class="material-symbols-outlined" id="cpn-toast-icon" style="font-size:18px;">check_circle</span>
+      <span id="cpn-toast-msg">Guardado</span>
+    </div>
+    `;
+  }
+
+  function _statCard(id, icon, label, sub) {
+    return `
+    <div class="bg-white rounded-xl p-5 shadow-sm border border-outline-variant/20">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="material-symbols-outlined text-secondary text-xl">${icon}</span>
+        <span class="text-xs font-bold uppercase tracking-widest text-outline">${label}</span>
+      </div>
+      <p class="font-headline font-extrabold text-3xl text-primary" id="${id}">—</p>
+      <p class="text-xs text-on-surface-variant mt-1">${sub}</p>
+    </div>`;
+  }
+
+  function _injectStyles() {
+    if (document.getElementById('cpn-styles')) return;
+
+    var s = document.createElement('style');
+    s.id = 'cpn-styles';
+    s.textContent = `
+      .cpn-modal-overlay {
+        display:none; position:fixed; inset:0;
+        background:rgba(19,31,11,0.35); backdrop-filter:blur(4px);
+        z-index:50; align-items:center; justify-content:center; padding:1rem 1.5rem;
+      }
+      .cpn-modal-overlay.active { display:flex; }
+      .cpn-modal-box { animation:cpnModalIn 0.22s ease; }
+      @keyframes cpnModalIn {
+        from { opacity:0; transform:scale(0.96) translateY(8px); }
+        to   { opacity:1; transform:scale(1) translateY(0); }
+      }
+      .cpn-field-input {
+        width:100%; background:#e9f9d8; border:none; border-radius:0.5rem;
+        padding:0.75rem 1rem; font-family:Poppins,sans-serif; font-size:0.875rem;
+        color:#131f0b; outline:none; box-sizing:border-box; transition:box-shadow 0.2s;
+      }
+      .cpn-field-input:focus { box-shadow:0 0 0 2px #bbeed0; }
+      .cpn-field-input[readonly],
+      .cpn-field-input:disabled { cursor:default; opacity:0.75; }
+      .cpn-field-input[readonly]:focus,
+      .cpn-field-input:disabled:focus { box-shadow:none; }
+      .cpn-field-select { appearance:auto; cursor:pointer; }
+      .cpn-field-select:disabled { cursor:default; }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  function _normalizeCampaniasResponse(result) {
+    if (Array.isArray(result)) return result;
+    if (!result) return [];
+
+    if (Array.isArray(result.data)) return result.data;
+    if (Array.isArray(result.items)) return result.items;
+    if (Array.isArray(result.campanias)) return result.campanias;
+
+    return [];
+  }
+
+  function _loadCampanias() {
+    return runServer('webAppListCampanias')
+      .then(function(result) {
+        console.log('[campanias] result:', result);
+
+        if (result && result.ok === false) {
+          throw new Error(result.message || 'Error al cargar campañas');
+        }
+
+        var data = _normalizeCampaniasResponse(result);
+
+        window._campaniasData      = data;
+        window._campaniasFiltradas = data.slice();
+
+        _updateStats();
+        _renderTable(window._campaniasFiltradas);
+
+        return result;
+      })
+      .catch(function(err) {
+        console.error('[campanias] load error:', err);
+
+        var tbody = document.getElementById('campanias-tbody');
+        var empty = document.getElementById('campanias-empty-state');
+        if (empty) empty.style.display = 'none';
+
+        if (tbody) {
+          tbody.innerHTML =
+            '<tr><td colspan="8" class="px-5 py-8 text-center text-error text-sm">' +
+            'Error al cargar: ' + escapeHtml(err && err.message ? err.message : String(err)) +
+            ' <button onclick="renderCampaniasView(document.getElementById(\'page-content\'))" class="ml-3 underline text-primary font-bold">Reintentar</button>' +
+            '</td></tr>';
+        }
+
+        throw err;
+      });
+  }
+
+  function _updateStats() {
+    var total       = window._campaniasData.length;
+    var enProgreso  = window._campaniasData.filter(function(c) { return c.estado === 'en_progreso'; }).length;
+    var planificada = window._campaniasData.filter(function(c) { return c.estado === 'planificada'; }).length;
+    var presupuesto = window._campaniasData.reduce(function(sum, c) {
+      return sum + (parseFloat(c.presupuesto) || 0);
+    }, 0);
+
+    _setText('cpn-stat-total', total);
+    _setText('cpn-stat-progreso', enProgreso);
+    _setText('cpn-stat-planificada', planificada);
+    _setText('cpn-stat-presupuesto', 'S/. ' + presupuesto.toLocaleString('es-PE', { minimumFractionDigits: 0 }));
+  }
+
+  function _renderTable(data) {
+    var tbody = document.getElementById('campanias-tbody');
+    var empty = document.getElementById('campanias-empty-state');
+    if (!tbody) return;
+
+    if (!data || !data.length) {
+      tbody.innerHTML = '';
+      if (empty) empty.style.display = 'flex';
+      return;
+    }
+
+    if (empty) empty.style.display = 'none';
+
+    tbody.innerHTML = data.map(function(c) {
+      var chip     = _estadoChip(c.estado);
+      var utilidad = parseFloat(c.utilidad) || 0;
+      var uColor   = utilidad >= 0 ? '#166534' : '#991b1b';
+
+      return '<tr style="transition:background 0.15s;" onmouseover="this.style.background=\'#fafff7\'" onmouseout="this.style.background=\'\'">' +
+        '<td class="px-5 py-3.5 text-xs text-outline font-mono">' + escapeHtml(String(c.campania_id || '')) + '</td>' +
+        '<td class="px-5 py-3.5 font-semibold text-on-surface">' + escapeHtml(c.nombre || '—') + '</td>' +
+        '<td class="px-5 py-3.5 text-on-surface-variant">' + escapeHtml(_formatDate(c.fecha_inicio)) + '</td>' +
+        '<td class="px-5 py-3.5 text-on-surface-variant">' + escapeHtml(_formatDate(c.fecha_fin)) + '</td>' +
+        '<td class="px-5 py-3.5 text-right font-semibold text-on-surface">' +
+          escapeHtml('S/. ' + (parseFloat(c.presupuesto) || 0).toLocaleString('es-PE')) +
+        '</td>' +
+        '<td class="px-5 py-3.5 text-right font-bold" style="color:' + uColor + ';">' +
+          escapeHtml('S/. ' + utilidad.toLocaleString('es-PE')) +
+        '</td>' +
+        '<td class="px-5 py-3.5 text-center">' + chip + '</td>' +
+        '<td class="px-5 py-3.5">' +
+          '<div class="flex items-center justify-center gap-1">' +
+            '<button onclick="campaniasOpenDetail(\'' + escapeHtml(String(c.campania_id || '')) + '\')" title="Ver" style="padding:6px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#717973;transition:all 0.2s;"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button>' +
+            '<button onclick="campaniasOpenEdit(\'' + escapeHtml(String(c.campania_id || '')) + '\')" title="Editar" style="padding:6px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#717973;transition:all 0.2s;"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>' +
+            '<button onclick="campaniasDeleteFromRow(\'' + escapeHtml(String(c.campania_id || '')) + '\')" title="Anular" style="padding:6px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#717973;transition:all 0.2s;"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button>' +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  window.campaniasFilterTable = function(q) {
+    var query = (q || '').toLowerCase().trim();
+
+    window._campaniasFiltradas = !query
+      ? window._campaniasData.slice()
+      : window._campaniasData.filter(function(c) {
+          return [c.nombre, c.estado, c.campania_id]
+            .map(function(v) { return String(v || '').toLowerCase(); })
+            .join(' ')
+            .indexOf(query) >= 0;
+        });
+
+    _renderTable(window._campaniasFiltradas);
+  };
+
+  function _estadoChip(estado) {
+    var map = {
+      'planificada': { bg:'#dbeafe', color:'#1e40af', label:'Planificada' },
+      'en_progreso': { bg:'#dcfce7', color:'#166534', label:'En Progreso' },
+      'finalizada':  { bg:'#e0e7ff', color:'#3730a3', label:'Finalizada' },
+      'anulada':     { bg:'#fee2e2', color:'#991b1b', label:'Anulada' }
+    };
+
+    var cfg = map[estado] || { bg:'#f3f4f6', color:'#6b7280', label: estado || '—' };
+
+    return '<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:9999px;background:' + cfg.bg + ';color:' + cfg.color + ';font-size:11px;font-weight:600;font-family:Poppins,sans-serif;">' +
+      escapeHtml(cfg.label) +
+      '</span>';
+  }
+
+  function _formatDate(val) {
+    if (!val) return '—';
+    var d = new Date(val);
+    if (isNaN(d)) return String(val);
+    return d.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  function _showToast(icon, msg) {
+    var t  = document.getElementById('cpn-toast');
+    var m  = document.getElementById('cpn-toast-msg');
+    var ic = document.getElementById('cpn-toast-icon');
+
+    if (!t) return;
+    if (m)  m.textContent = msg;
+    if (ic) ic.textContent = icon;
+
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+    t.style.pointerEvents = 'auto';
+
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(function() {
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(-50%) translateY(8px)';
+      t.style.pointerEvents = 'none';
+    }, 3000);
+  }
+
+  function _setText(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = val != null ? val : '—';
+  }
+
+  function _setVal(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.value = val != null ? val : '';
+  }
+
+  function _getVal(id) {
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  window.campaniasLoad        = _loadCampanias;
+  window.campaniasRenderTable = _renderTable;
+  window.campaniasUpdateStats = _updateStats;
+  window.campaniasFormatDate  = _formatDate;
+  window.campaniasShowToast   = _showToast;
+  window.campaniasSetText     = _setText;
+  window.campaniasSetVal      = _setVal;
+  window.campaniasGetVal      = _getVal;
+
+  window.onGlobalSearch_campanias = function(q) {
+    var inp = document.getElementById('campanias-search');
+    if (inp) inp.value = q || '';
+    window.campaniasFilterTable(q);
+  };
+
+})();
+</script>

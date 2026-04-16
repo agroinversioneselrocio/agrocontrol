@@ -1,0 +1,357 @@
+<div id="dashboard-view"></div>
+
+<script>
+// ============================================================
+// DASHBOARD — renderDashboardView
+// ============================================================
+
+function renderDashboardView(container) {
+  container.innerHTML = _buildDashboardSkeleton();
+  return updateDashboardData();
+}
+
+// ── Skeleton inicial ──────────────────────────────────────────
+function _buildDashboardSkeleton() {
+  return '<div>' +
+    '<div style="display:flex; justify-content:space-between; ' +
+      'align-items:center; margin-bottom:28px;">' +
+      '<div>' +
+        '<h2 style="font-family:Manrope; font-size:28px; font-weight:800; ' +
+          'color:var(--primary-color); margin:0 0 4px;">Bienvenido</h2>' +
+        '<p style="color:var(--text-muted); font-size:14px; margin:0;">' +
+          'Cargando datos del sistema...' +
+        '</p>' +
+      '</div>' +
+      '<div style="display:flex; gap:12px;">' +
+        '<button class="btn btn-primary" onclick="showForm(\'actividades\')">' +
+          '<span class="material-symbols-outlined">add</span> Nueva Actividad' +
+        '</button>' +
+        '<button class="btn btn-secondary" onclick="showForm(\'cosechas\')">' +
+          '<span class="material-symbols-outlined">grass</span> Nueva Cosecha' +
+        '</button>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="kpi-grid" id="kpi-grid">' +
+      ['','','',''].map(function(){
+        return '<div class="kpi-card">' +
+          '<div class="skeleton-line" style="width:40%; height:32px; margin-bottom:12px;"></div>' +
+          '<div class="skeleton-line" style="width:70%;"></div>' +
+          '<div class="skeleton-line" style="width:50%; height:10px;"></div>' +
+        '</div>';
+      }).join('') +
+    '</div>' +
+
+    '<div id="dash-body" style="display:grid; ' +
+      'grid-template-columns:1fr 320px; gap:28px; margin-top:28px;">' +
+      '<div>' +
+        '<div style="display:flex; justify-content:space-between; ' +
+          'align-items:center; margin-bottom:16px;">' +
+          '<h3 style="font-size:18px; font-weight:700; font-family:Manrope; margin:0;">' +
+            'Actividades Recientes' +
+          '</h3>' +
+          '<a href="#" onclick="navigateTo(\'activities\',\'Actividades\',' +
+            '\'Gestión de Tareas\'); return false;" ' +
+            'style="color:var(--primary-color); font-weight:600; font-size:13px;">' +
+            'Ver todas →' +
+          '</a>' +
+        '</div>' +
+        '<div id="recent-activities-list">' +
+          '<div class="dash-activity-card">' +
+            '<div style="flex:1;">' +
+              '<div class="skeleton-line" style="width:60%; margin-bottom:8px;"></div>' +
+              '<div class="skeleton-line" style="width:40%; height:10px;"></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="dash-activity-card">' +
+            '<div style="flex:1;">' +
+              '<div class="skeleton-line" style="width:50%; margin-bottom:8px;"></div>' +
+              '<div class="skeleton-line" style="width:35%; height:10px;"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:flex; flex-direction:column; gap:16px;">' +
+        '<div class="widget" id="widget-estados">' +
+          '<div class="skeleton-line" style="width:60%; margin-bottom:14px;"></div>' +
+          '<div class="skeleton-line"></div>' +
+          '<div class="skeleton-line"></div>' +
+          '<div class="skeleton-line"></div>' +
+        '</div>' +
+        '<div class="widget" id="widget-campos">' +
+          '<div class="skeleton-line" style="width:50%; margin-bottom:14px;"></div>' +
+          '<div class="skeleton-line" style="height:40px;"></div>' +
+        '</div>' +
+        '<div class="widget" id="widget-alertas">' +
+          '<div class="skeleton-line" style="width:40%; margin-bottom:14px;"></div>' +
+          '<div class="skeleton-line"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+// ── Carga de datos reales ─────────────────────────────────────
+async function updateDashboardData() {
+  try {
+    var result = await runServer('webAppGetDashboard');
+
+    if (!result || !result.ok) {
+      console.warn('Dashboard sin datos:', result);
+      _renderDashboardEmpty();
+      return;
+    }
+
+    var data = result.data;
+    _renderKPIs(data);
+    _renderWidgetEstados(data.actividades);
+    _renderWidgetCampos(data.campos);
+    _renderWidgetAlertas(data.insumos);
+    _renderRecentActivities();
+
+  } catch (err) {
+    console.error('updateDashboardData:', err);
+    _renderDashboardEmpty();
+  }
+}
+
+// ── KPIs ──────────────────────────────────────────────────────
+function _renderKPIs(data) {
+  var act      = data.actividades || {};
+  var campos   = data.campos      || {};
+  var insumos  = data.insumos     || {};
+  var personal = data.personal    || {};
+
+  var kpis = [
+    {
+      icon:  'agriculture',
+      label: 'Actividades',
+      value: act.total || 0,
+      sub:   (act.en_proceso || 0) + ' en proceso',
+      color: '#003622'
+    },
+    {
+      icon:  'map',
+      label: 'Campos Activos',
+      value: campos.activos || campos.total || 0,
+      sub:   (campos.total || 0) + ' registrados',
+      color: '#006c4a'
+    },
+    {
+      icon:  'inventory_2',
+      label: 'Insumos en Stock',
+      value: insumos.total || 0,
+      sub:   (insumos.bajo_stock || 0) + ' bajo mínimo',
+      color: '#0f766e'
+    },
+    {
+      icon:  'group',
+      label: 'Personal Activo',
+      value: personal.activos || personal.total || 0,
+      sub:   'operarios registrados',
+      color: '#1d4ed8'
+    }
+  ];
+
+  var html = '';
+  kpis.forEach(function(k) {
+    // Valores numéricos del sistema — no requieren escapeHtml
+    html +=
+      '<div class="kpi-card" style="position:relative; overflow:hidden;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
+          '<div>' +
+            '<div class="kpi-value" style="color:' + k.color + ';">' + k.value + '</div>' +
+            '<div class="kpi-label">' + k.label + '</div>' +
+            '<div style="font-size:11px; color:var(--text-muted); margin-top:4px;">' +
+              k.sub +
+            '</div>' +
+          '</div>' +
+          '<span class="material-symbols-outlined" ' +
+            'style="font-size:40px; color:' + k.color + '; opacity:0.12; margin-top:-4px;">' +
+            k.icon +
+          '</span>' +
+        '</div>' +
+      '</div>';
+  });
+
+  var grid = document.getElementById('kpi-grid');
+  if (grid) grid.innerHTML = html;
+}
+
+// ── Actividades recientes ─────────────────────────────────────
+function _renderRecentActivities() {
+  var container = document.getElementById('recent-activities-list');
+  if (!container) return;
+
+  runServer('webAppListActividades').then(function(result) {
+    var items = (result && result.ok) ? (result.data || []) : [];
+
+    if (items.length === 0) {
+      container.innerHTML =
+        '<div style="text-align:center; padding:40px; color:var(--text-muted);">' +
+          '<span class="material-symbols-outlined" ' +
+            'style="font-size:40px; display:block; margin-bottom:8px;">assignment</span>' +
+          'No hay actividades registradas' +
+        '</div>';
+      return;
+    }
+
+    // Últimas 5
+    var recientes = items.slice(-5).reverse();
+    var html = '';
+    recientes.forEach(function(a) {
+      // FIX: escapar datos de usuario antes de inyectar con innerHTML
+      var nombre  = escapeHtml(a.nombre_actividad || 'Sin nombre');
+      var tipo    = escapeHtml(a.tipo_actividad   || '');
+      var campo   = escapeHtml(a.campo_id         || '');
+      var fecha   = escapeHtml(a.fecha_programada || '');
+      var estado  = escapeHtml(a.estado_actividad || '');
+
+      html +=
+        '<div class="dash-activity-card" ' +
+          'onclick="navigateTo(\'activities\',\'Actividades\',\'Gestión de Tareas\')">' +
+          '<div style="flex:1;">' +
+            '<div style="font-weight:600; font-size:14px; margin-bottom:4px;">' +
+              nombre +
+            '</div>' +
+            '<div style="font-size:12px; color:var(--text-muted); ' +
+              'display:flex; gap:12px; flex-wrap:wrap;">' +
+              (tipo  ? '<span>📋 ' + tipo  + '</span>' : '') +
+              (campo ? '<span>🌿 ' + campo + '</span>' : '') +
+              (fecha ? '<span>📅 ' + fecha + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<span class="badge badge--' + estado + '">' + (estado || '-') + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+
+  }).catch(function() {
+    var c = document.getElementById('recent-activities-list');
+    if (c) c.innerHTML =
+      '<div style="text-align:center; padding:40px; color:#ba1a1a;">' +
+        '❌ Error al cargar actividades' +
+      '</div>';
+  });
+}
+
+// ── Widget: estados ───────────────────────────────────────────
+function _renderWidgetEstados(stats) {
+  var el = document.getElementById('widget-estados');
+  if (!el) return;
+
+  stats = stats || {};
+  var total = stats.total || 1;
+  var items = [
+    { label:'Pendiente',  val: stats.pendiente  || 0, color:'#f59e0b' },
+    { label:'En Proceso', val: stats.en_proceso || 0, color:'#3b82f6' },
+    { label:'Completada', val: stats.completada || 0, color:'#22c55e' },
+    { label:'Anulada',    val: stats.anulada    || 0, color:'#ef4444' }
+  ];
+
+  var html =
+    '<h3 style="font-size:15px; font-weight:700; margin:0 0 14px; ' +
+      'display:flex; align-items:center; gap:6px;">' +
+      '<span class="material-symbols-outlined" style="font-size:18px;">donut_small</span>' +
+      ' Estado de Actividades' +
+    '</h3>';
+
+  items.forEach(function(item) {
+    var pct = Math.round((item.val / total) * 100);
+    html +=
+      '<div style="margin-bottom:10px;">' +
+        '<div style="display:flex; justify-content:space-between; ' +
+          'font-size:12px; margin-bottom:3px;">' +
+          '<span>' + item.label + '</span>' +
+          '<strong>' + item.val + '</strong>' +
+        '</div>' +
+        '<div class="progress-bar-wrap">' +
+          '<div class="progress-bar-fill" ' +
+            'style="width:' + pct + '%; background:' + item.color + ';"></div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// ── Widget: campos ────────────────────────────────────────────
+function _renderWidgetCampos(campos) {
+  var el = document.getElementById('widget-campos');
+  if (!el) return;
+
+  campos = campos || {};
+  var total   = campos.total   || 0;
+  var activos = campos.activos || 0;
+
+  el.innerHTML =
+    '<h3 style="font-size:15px; font-weight:700; margin:0 0 14px; ' +
+      'display:flex; align-items:center; gap:6px;">' +
+      '<span class="material-symbols-outlined" style="font-size:18px;">map</span>' +
+      ' Campos' +
+    '</h3>' +
+    '<div style="display:flex; gap:16px; text-align:center;">' +
+      '<div style="flex:1; background:#f0f7ea; border-radius:10px; padding:12px;">' +
+        '<div style="font-size:28px; font-weight:800; color:var(--primary-color);">' +
+          total +
+        '</div>' +
+        '<div style="font-size:11px; color:var(--text-muted);">Total</div>' +
+      '</div>' +
+      '<div style="flex:1; background:#dcfce7; border-radius:10px; padding:12px;">' +
+        '<div style="font-size:28px; font-weight:800; color:#166534;">' +
+          activos +
+        '</div>' +
+        '<div style="font-size:11px; color:var(--text-muted);">Activos</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// ── Widget: alertas ───────────────────────────────────────────
+function _renderWidgetAlertas(insumos) {
+  var el = document.getElementById('widget-alertas');
+  if (!el) return;
+
+  insumos = insumos || {};
+  var bajoStock = insumos.bajo_stock || 0;
+
+  el.innerHTML =
+    '<h3 style="font-size:15px; font-weight:700; margin:0 0 14px; ' +
+      'display:flex; align-items:center; gap:6px;">' +
+      '<span class="material-symbols-outlined" ' +
+        'style="font-size:18px; color:#f59e0b;">warning</span>' +
+      ' Alertas' +
+    '</h3>' +
+    (bajoStock > 0
+      ? '<div style="background:#fef9c3; padding:10px 12px; border-radius:8px; ' +
+          'font-size:13px; color:#854d0e; cursor:pointer;" ' +
+          'onclick="navigateTo(\'recursos\',\'Recursos\',\'Personal, Insumos y Equipos\')">' +
+          '⚠️ <strong>' + bajoStock + '</strong> insumo(s) bajo stock mínimo' +
+        '</div>'
+      : '<div style="background:#dcfce7; padding:10px 12px; border-radius:8px; ' +
+          'font-size:13px; color:#166534;">' +
+          '✅ Sin alertas críticas activas' +
+        '</div>'
+    );
+}
+
+// ── Dashboard vacío (fallback) ────────────────────────────────
+function _renderDashboardEmpty() {
+  var grid = document.getElementById('kpi-grid');
+  if (grid) {
+    var labels = ['Actividades','Campos','Insumos','Personal'];
+    grid.innerHTML = labels.map(function(l) {
+      return '<div class="kpi-card">' +
+        '<div class="kpi-value" style="color:var(--primary-color);">0</div>' +
+        '<div class="kpi-label">' + l + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  var ra = document.getElementById('recent-activities-list');
+  if (ra) ra.innerHTML =
+    '<div style="text-align:center; padding:40px; color:var(--text-muted);">' +
+      'Sin datos disponibles' +
+    '</div>';
+}
+</script>

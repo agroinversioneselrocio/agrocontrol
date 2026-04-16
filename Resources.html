@@ -1,0 +1,214 @@
+<div id="resources-view" class="hidden">
+  <div class="resource-tabs">
+    <button class="resource-tab active" data-resource="personal"
+            onclick="switchResource('personal')">Personal</button>
+    <button class="resource-tab" data-resource="insumos"
+            onclick="switchResource('insumos')">Insumos</button>
+    <button class="resource-tab" data-resource="equipos"
+            onclick="switchResource('equipos')">Equipos</button>
+    <button class="resource-tab" data-resource="gastos"
+            onclick="switchResource('gastos')">Gastos</button>
+  </div>
+
+  <div class="resource-stat" id="resource-stats">
+    <!-- Stats injected dynamically -->
+  </div>
+
+  <div class="list-header">
+    <h2 class="list-title" id="resource-title">Personal</h2>
+    <button class="btn btn-primary" id="resource-btn" onclick="showForm('personal')">
+      <span class="material-symbols-outlined">add</span> Agregar
+    </button>
+  </div>
+
+  <div class="card">
+    <div id="resource-list">
+      <div style="display:flex; align-items:center; justify-content:center; padding:40px;">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var currentResource = 'personal';
+
+// ── Renderer principal ────────────────────────────────────────
+async function renderResourcesList(container) {
+  var view = document.getElementById('resources-view');
+  if (view) view.classList.remove('hidden');
+  await loadResourceList('personal');
+}
+
+// ── Cambio de pestaña ─────────────────────────────────────────
+async function switchResource(type) {
+  currentResource = type;
+  document.querySelectorAll('.resource-tab').forEach(function(t) {
+    t.classList.remove('active');
+    if (t.dataset.resource === type) t.classList.add('active');
+  });
+  await loadResourceList(type);
+}
+
+// ── Carga de lista ────────────────────────────────────────────
+async function loadResourceList(type) {
+  var fns = {
+    personal: 'webAppListPersonal',
+    insumos:  'webAppListInsumos',
+    equipos:  'webAppListEquipos',
+    gastos:   'webAppListGastos'
+  };
+
+  var listEl  = document.getElementById('resource-list');
+  var titleEl = document.getElementById('resource-title');
+  var btnEl   = document.getElementById('resource-btn');
+  var statsEl = document.getElementById('resource-stats');
+
+  // Spinner mientras carga
+  if (listEl) {
+    listEl.innerHTML =
+      '<div style="display:flex; align-items:center; justify-content:center; padding:40px;">' +
+        '<div class="spinner"></div>' +
+      '</div>';
+  }
+
+  try {
+    var result = await runServer(fns[type]);
+    var items  = (result && result.ok) ? (result.data || []) : [];
+
+    // textContent para título — nunca innerHTML con datos externos
+    if (titleEl) {
+      titleEl.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+    }
+    if (btnEl) {
+      btnEl.onclick = function() { showForm(type); };
+    }
+
+    // Stats solo usa números (length, filter) — seguro
+    if (statsEl) {
+      statsEl.innerHTML = getResourceStats(type, items);
+    }
+
+    // Tabla
+    var html =
+      '<div class="list-table-wrapper">' +
+        '<table class="list-table">' +
+          '<thead><tr>' + getResourceHeaders(type) + '</tr></thead>' +
+          '<tbody>';
+
+    if (items.length === 0) {
+      html +=
+        '<tr>' +
+          '<td colspan="8" class="list-empty">' +
+            '<div class="list-empty-icon">📦</div>' +
+            '<div class="list-empty-text">No hay registros</div>' +
+          '</td>' +
+        '</tr>';
+    } else {
+      // FIX: getResourceRows ahora escapa todos los datos de usuario
+      html += getResourceRows(type, items);
+    }
+
+    html += '</tbody></table></div>';
+    if (listEl) listEl.innerHTML = html;
+
+  } catch (err) {
+    // FIX: escapar err.message antes de inyectar con innerHTML
+    var msg = escapeHtml(err ? (err.message || String(err)) : 'Error desconocido');
+    if (listEl) {
+      listEl.innerHTML =
+        '<div style="text-align:center; padding:40px; color:#ba1a1a;">' +
+          '<span class="material-symbols-outlined" ' +
+            'style="font-size:40px; display:block; margin-bottom:8px;">error</span>' +
+          'Error al cargar recursos: ' + msg +
+        '</div>';
+    }
+  }
+}
+
+// ── Stats — solo usa números, sin datos de usuario ────────────
+function getResourceStats(type, items) {
+  if (type === 'personal') {
+    var activos = items.filter(function(i) {
+      return i.estado === 'activo';
+    }).length;
+    return '<div class="stat-box primary">' +
+             '<div class="stat-value">' + items.length + '</div>' +
+             '<div class="stat-label">Total</div>' +
+           '</div>' +
+           '<div class="stat-box success">' +
+             '<div class="stat-value">' + activos + '</div>' +
+             '<div class="stat-label">Activos</div>' +
+           '</div>';
+  }
+  return '';
+}
+
+// ── Headers — strings literales, sin datos de usuario ─────────
+function getResourceHeaders(type) {
+  var headers = {
+    personal: '<th>ID</th><th>Nombre</th><th>DNI</th><th>Cargo</th><th>Acciones</th>',
+    insumos:  '<th>ID</th><th>Nombre</th><th>Stock</th><th>Precio</th><th>Acciones</th>',
+    equipos:  '<th>ID</th><th>Nombre</th><th>Tipo</th><th>Acciones</th>',
+    gastos:   '<th>ID</th><th>Categoría</th><th>Monto</th><th>Acciones</th>'
+  };
+  return headers[type] || '';
+}
+
+// ── Rows — FIX: escapar TODOS los campos de usuario ───────────
+function getResourceRows(type, items) {
+  var html = '';
+
+  items.forEach(function(i) {
+    // FIX: escapar id y nombre antes de inyectar con innerHTML
+    var id     = escapeHtml(String(i[type + '_id'] || ''));
+    var nombre = escapeHtml(i.nombre || '-');
+
+    // Columnas extra según tipo, todas escapadas
+    var extra = '';
+    if (type === 'personal') {
+      var dni   = escapeHtml(i.dni   || '-');
+      var cargo = escapeHtml(i.cargo || '-');
+      extra = '<td>' + dni + '</td><td>' + cargo + '</td>';
+    } else if (type === 'insumos') {
+      var stock  = escapeHtml(String(i.stock_actual || '-'));
+      var precio = escapeHtml(String(i.precio_unitario || '-'));
+      extra = '<td>' + stock + '</td><td>' + precio + '</td>';
+    } else if (type === 'equipos') {
+      var tipoEquipo = escapeHtml(i.tipo_equipo || '-');
+      extra = '<td>' + tipoEquipo + '</td>';
+    } else if (type === 'gastos') {
+      var categoria = escapeHtml(i.categoria || '-');
+      var monto     = escapeHtml(String(i.monto || '-'));
+      // Para gastos el "nombre" es la categoría, reemplazamos
+      nombre = categoria;
+      extra  = '<td>' + monto + '</td>';
+    }
+
+    html +=
+      '<tr>' +
+        '<td>' + id     + '</td>' +
+        '<td>' + nombre + '</td>' +
+        extra +
+        '<td>' +
+          '<button class="list-action-btn" ' +
+            'onclick="showForm(\'' + type + '\', \'' + id + '\')">' +
+            '<span class="material-symbols-outlined">edit</span>' +
+          '</button>' +
+        '</td>' +
+      '</tr>';
+  });
+
+  return html;
+}
+
+// ── Búsqueda global delegada ──────────────────────────────────
+function onGlobalSearch_resources(value) {
+  var rows = document.querySelectorAll('#resource-list tbody tr');
+  var q    = (value || '').toLowerCase();
+  rows.forEach(function(row) {
+    row.style.display =
+      row.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+  });
+}
+</script>

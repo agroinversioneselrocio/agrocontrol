@@ -1,0 +1,103 @@
+<style>
+  /* ============================================================
+     Styles.html - ROCÍO AGROCONTROL V2
+     Layout de Scroll Independiente
+     ============================================================ */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-color: #f5fcf0;
+    --sidebar-color: #f0f7ea;
+    --primary-color: #003622;
+    --accent-color: #4ade80;
+    --text-dark: #1a2e1a;
+    --text-muted: #6b7280;
+    --white: #ffffff;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg-color); color: var(--text-dark); height: 100vh; overflow: hidden; }
+
+  /* Contenedor Principal Flex - Ocupa toda la pantalla */
+  .app-shell { 
+    display: flex; 
+    height: 100vh; 
+    width: 100vw;
+    overflow: hidden; 
+  }
+
+  /* Sidebar - Scroll Independiente */
+  .sidebar { 
+    width: 280px; 
+    background: var(--sidebar-color); 
+    border-right: 1px solid #e3f3d2; 
+    padding: 24px; 
+    display: flex; 
+    flex-direction: column; 
+    flex-shrink: 0;
+    height: 100vh; 
+    overflow-y: auto; 
+  }
+
+  /* Contenido Principal - Scroll Independiente */
+  .main-content { 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    height: 100vh; 
+    overflow: hidden;
+  }
+
+  .top-bar { 
+    height: 70px; 
+    flex-shrink: 0;
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    padding: 0 32px; 
+    border-bottom: 1px solid #e3f3d2; 
+    background: var(--white); 
+  }
+
+  .content-area { 
+    padding: 32px; 
+    flex-grow: 1; 
+    overflow-y: auto; /* Aquí vive el scroll del contenido */
+  }
+
+  /* Sidebar Branding */
+  .brand-logo { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 20px; color: var(--primary-color); margin-bottom: 32px; }
+  .brand-sub { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Navigation */
+  .nav-menu { list-style: none; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .nav-item { padding: 12px 16px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--text-muted); font-weight: 500; transition: all 0.2s; }
+  .nav-item:hover, .nav-item.active { background: var(--white); color: var(--primary-color); font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+/* Dashboard Cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
+  .kpi-card { background: var(--white); padding: 24px; border-radius: 16px; border: 1px solid #e3f3d2; }
+  .kpi-value { font-size: 36px; font-weight: 800; color: var(--primary-color); }
+  .kpi-label { font-size: 14px; color: var(--text-muted); margin-top: 8px; }
+  
+  /* Dashboard Layout */
+  .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+  .dashboard-intelligence { margin-bottom: 32px; }
+  .left-col { }
+  .right-col { }
+  
+  /* Activities */
+  .recent-activities-list { display: flex; flex-direction: column; gap: 12px; }
+  .activity-card { background: var(--white); padding: 16px; border-radius: 12px; border: 1px solid #e3f3d2; }
+  
+  /* Widget */
+  .widget { background: var(--white); padding: 20px; border-radius: 16px; border: 1px solid #e3f3d2; margin-bottom: 16px; }
+  
+  /* Buttons */
+  .btn { padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; }
+  .btn-primary { background: var(--primary-color); color: var(--white); }
+  .btn-primary:hover { background: #004d2e; }
+  .btn-secondary { background: var(--white); color: var(--primary-color); border: 1px solid #e3f3d2; }
+  .btn-secondary:hover { background: #f0f7ea; }
+  
+  /* Utilities */
+  .hidden { display: none !important; }
+</style>

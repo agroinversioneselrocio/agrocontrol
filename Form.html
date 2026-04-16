@@ -1,0 +1,431 @@
+<div id="form-modal" class="form-modal">
+  <div class="form-modal__content">
+    <div class="form-modal__header">
+      <h3 class="form-modal__title" id="form-modal-title">Nuevo Registro</h3>
+      <button class="form-modal__close" onclick="closeForm()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="form-modal-form" class="form-modal__body" onsubmit="return false;">
+    </form>
+  </div>
+</div>
+
+<style>
+  .form-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(3px);
+  }
+  .form-modal.active { display: flex; }
+
+  .form-modal__content {
+    background: white;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #e3f3d2;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+    border-radius: 20px 20px 0 0;
+  }
+  .form-modal__title {
+    font-family: Manrope, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-color, #003622);
+    margin: 0;
+  }
+  .form-modal__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 4px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    transition: background 0.2s;
+  }
+  .form-modal__close:hover { background: #f0f7ea; }
+
+  .form-modal__body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-modal__group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-modal__label {
+    font-family: Poppins, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #1a2e1a;
+  }
+  .form-modal__label .req { color: #ba1a1a; margin-left: 2px; }
+
+  .form-modal__input,
+  .form-modal__select,
+  .form-modal__textarea {
+    width: 100%;
+    padding: 10px 13px;
+    border-radius: 10px;
+    border: 1px solid #c0c9c1;
+    background: white;
+    font-size: 14px;
+    font-family: Inter, sans-serif;
+    color: #1a2e1a;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+  }
+  .form-modal__input:focus,
+  .form-modal__select:focus,
+  .form-modal__textarea:focus {
+    outline: none;
+    border-color: #003622;
+    box-shadow: 0 0 0 3px rgba(0,54,34,0.1);
+  }
+  .form-modal__textarea { resize: vertical; min-height: 80px; }
+
+  .form-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px 20px;
+    border-top: 1px solid #e3f3d2;
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-radius: 0 0 20px 20px;
+  }
+</style>
+
+<script>
+var _currentFormType    = null;
+var _currentFormId      = null;
+var _overlayListenerSet = false;
+
+
+// ── Abrir formulario ──────────────────────────────────────────
+async function _showFormModal(type, id) {
+
+  _currentFormType = type;
+  _currentFormId   = id || null;
+
+  var modal   = document.getElementById('form-modal');
+  var titleEl = document.getElementById('form-modal-title');
+  var formEl  = document.getElementById('form-modal-form');
+  if (!modal || !titleEl || !formEl) return;
+
+  if (!_overlayListenerSet) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) closeForm();
+    });
+    _overlayListenerSet = true;
+  }
+
+  titleEl.textContent = id
+    ? 'Editar '  + _getFormLabel(type)
+    : 'Nuevo '   + _getFormLabel(type);
+
+  formEl.innerHTML =
+    '<div style="text-align:center;padding:40px;">' +
+      '<div class="spinner" style="margin:0 auto;"></div>' +
+    '</div>';
+
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  var data = {};
+  if (id) {
+    try {
+      var fnMap = {
+        campos:      'webAppGetCampo',
+        actividades: 'webAppGetActividad',
+        personal:    'webAppGetPersonal',
+        insumos:     'webAppGetInsumo',
+        equipos:     'webAppGetEquipo',
+        gastos:      'webAppGetGasto',
+        campanias:   'webAppGetCampania',
+        cosechas:    'webAppGetCosecha',
+        ventas:      'webAppGetVenta'
+      };
+      var fn     = fnMap[type];
+      var result = fn ? await runServer(fn, { id: id }) : null;
+      data = (result && result.ok && result.data) ? result.data : {};
+    } catch (err) {
+      console.error('showForm load error:', err);
+      data = {};
+    }
+  }
+
+  formEl.innerHTML = _buildFormFields(type, data) + _buildFormFooter(id);
+}
+
+// ── Cerrar formulario ─────────────────────────────────────────
+function closeForm() {
+  var modal = document.getElementById('form-modal');
+  if (modal) modal.classList.remove('active');
+  document.body.style.overflow = '';
+  _currentFormType = null;
+  _currentFormId   = null;
+}
+
+// ── Enviar formulario ─────────────────────────────────────────
+async function submitForm() {
+  var formEl = document.getElementById('form-modal-form');
+  if (!formEl) return;
+
+  var btn = formEl.querySelector('.form-modal__btn-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try {
+    var payload = _collectFormData(formEl);
+    if (_currentFormId) payload.id = _currentFormId;
+
+    // ✅ CORREGIDO — usa los nombres reales de API.gs (webAppSave*)
+    var fnMap = {
+      campos:      'webAppSaveCampo',
+      actividades: 'webAppSaveActividad',
+      personal:    'webAppSavePersonal',
+      insumos:     'webAppSaveInsumo',
+      equipos:     'webAppSaveEquipo',
+      gastos:      'webAppSaveGasto',
+      campanias:   'webAppSaveCampania',
+      cosechas:    'webAppSaveCosecha',
+      ventas:      'webAppSaveVenta'
+    };
+
+    var fn     = fnMap[_currentFormType];
+    var result = fn ? await runServer(fn, payload) : null;
+
+    if (result && result.ok) {
+      closeForm();
+      if (typeof navigateTo === 'function') {
+        navigateTo(_currentFormType || 'dashboard');
+      }
+    } else {
+      var errMsg = (result && result.message) ? result.message : 'No se pudo guardar el registro.';
+      alert(errMsg);
+      if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+    }
+  } catch (err) {
+    console.error('submitForm error:', err);
+    alert('Error al guardar: ' + (err.message || 'Error desconocido'));
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
+}
+
+// ── Recolectar datos ──────────────────────────────────────────
+function _collectFormData(formEl) {
+  var data = {};
+  formEl.querySelectorAll('.form-modal__input, .form-modal__select, .form-modal__textarea')
+    .forEach(function(input) {
+      if (input.name) data[input.name] = input.value;
+    });
+  return data;
+}
+
+// ── Label por tipo ────────────────────────────────────────────
+function _getFormLabel(type) {
+  var labels = {
+    campos:      'Campo',
+    actividades: 'Actividad',
+    personal:    'Personal',
+    insumos:     'Insumo',
+    equipos:     'Equipo',
+    gastos:      'Gasto',
+    campanias:   'Campaña',
+    cosechas:    'Cosecha',
+    ventas:      'Venta'
+  };
+  return labels[type] || type;
+}
+
+// ── Footer ────────────────────────────────────────────────────
+function _buildFormFooter(id) {
+  return '<div class="form-modal__footer">' +
+    '<button type="button" class="btn btn-secondary" onclick="closeForm()">Cancelar</button>' +
+    '<button type="button" class="btn btn-primary form-modal__btn-submit" onclick="submitForm()">' +
+      (id ? 'Actualizar' : 'Guardar') +
+    '</button>' +
+  '</div>';
+}
+
+// ── Campos por tipo ───────────────────────────────────────────
+function _buildFormFields(type, d) {
+  var builders = {
+
+    // ── Campos ──────────────────────────────────────────────
+    campos: function() {
+      return _f('Nombre del Campo', 'nombre',       'text',     escapeHtml(d.nombre          || ''), true) +
+             _f('Ubicación',        'ubicacion',    'text',     escapeHtml(d.ubicacion       || ''), true) +
+             _f('Hectáreas',        'hectareas',    'number',   escapeHtml(String(d.hectareas || '')), true) +
+             _f('Tipo de Cultivo',  'tipo_cultivo', 'text',     escapeHtml(d.tipo_cultivo    || '')) +
+             _f('Propietario',      'propietario',  'text',     escapeHtml(d.propietario     || '')) +
+             _s('Estado',           'estado',       ['activo','inactivo'], d.estado || 'activo');
+    },
+
+    // ── Actividades ─────────────────────────────────────────
+    actividades: function() {
+      return _f('Nombre de Actividad', 'nombre_actividad',  'text',     escapeHtml(d.nombre_actividad  || ''), true) +
+             _f('Tipo de Actividad',   'tipo_actividad',    'text',     escapeHtml(d.tipo_actividad    || '')) +
+             _f('Campo ID',            'campo_id',          'text',     escapeHtml(d.campo_id          || '')) +
+             _f('Campaña ID',          'campania_id',       'text',     escapeHtml(d.campania_id       || '')) +
+             _f('Fecha Programada',    'fecha_programada',  'date',     escapeHtml(d.fecha_programada  || '')) +
+             _s('Estado',              'estado_actividad',  ['pendiente','en_proceso','completada','anulada'], d.estado_actividad || 'pendiente') +
+             _f('Costo Total (S/.)',   'costo_total',       'number',   escapeHtml(String(d.costo_total || ''))) +
+             _f('Notas',               'notas',             'textarea', escapeHtml(d.notas             || ''));
+    },
+
+    // ── Personal ────────────────────────────────────────────
+    personal: function() {
+      return _f('Nombre',   'nombre',        'text',   escapeHtml(d.nombre        || ''), true) +
+             _f('Apellido', 'apellido',      'text',   escapeHtml(d.apellido      || ''), true) +
+             _f('DNI',      'dni',           'text',   escapeHtml(d.dni           || ''), true) +
+             _f('Cargo',    'cargo',         'text',   escapeHtml(d.cargo         || '')) +
+             _f('Teléfono', 'telefono',      'tel',    escapeHtml(d.telefono      || '')) +
+             _f('Salario Base (S/.)', 'salario_base', 'number', escapeHtml(String(d.salario_base || ''))) +
+             _f('Fecha Ingreso', 'fecha_ingreso', 'date', escapeHtml(d.fecha_ingreso || '')) +
+             _s('Estado',  'estado',         ['activo','inactivo'], d.estado || 'activo');
+    },
+
+    // ── Insumos ─────────────────────────────────────────────
+    insumos: function() {
+      return _f('Nombre del Insumo',  'nombre',                'text',   escapeHtml(d.nombre                || ''), true) +
+             _f('Unidad de Medida',   'unidad_medida',         'text',   escapeHtml(d.unidad_medida         || ''), true) +
+             _f('Categoría',          'categoria',             'text',   escapeHtml(d.categoria             || '')) +
+             _f('Stock Actual',       'stock_actual',          'number', escapeHtml(String(d.stock_actual    || ''))) +
+             _f('Stock Mínimo',       'stock_minimo',          'number', escapeHtml(String(d.stock_minimo    || ''))) +
+             _f('Precio Unitario (S/.)', 'precio_unitario',    'number', escapeHtml(String(d.precio_unitario || ''))) +
+             _f('Proveedor',          'proveedor',             'text',   escapeHtml(d.proveedor             || '')) +
+             _f('Fecha Vencimiento',  'fecha_vencimiento',     'date',   escapeHtml(d.fecha_vencimiento     || '')) +
+             _f('Período Carencia (días)', 'periodo_carencia_dias', 'number', escapeHtml(String(d.periodo_carencia_dias || ''))) +
+             _s('Estado',             'estado',                ['activo','inactivo'], d.estado || 'activo') +
+             _f('Observaciones',      'observaciones',         'textarea', escapeHtml(d.observaciones       || ''));
+    },
+
+    // ── Equipos ─────────────────────────────────────────────
+    equipos: function() {
+      return _f('Nombre del Equipo',  'nombre',               'text',   escapeHtml(d.nombre               || ''), true) +
+             _f('Tipo',               'tipo',                 'text',   escapeHtml(d.tipo                 || '')) +
+             _f('Marca',              'marca',                'text',   escapeHtml(d.marca                || '')) +
+             _f('Modelo',             'modelo',               'text',   escapeHtml(d.modelo               || '')) +
+             _f('Número de Serie',    'numero_serie',         'text',   escapeHtml(d.numero_serie         || '')) +
+             _f('Costo por Hora (S/.)', 'costo_hora',         'number', escapeHtml(String(d.costo_hora     || ''))) +
+             _f('Costo por Día (S/.)', 'costo_dia',           'number', escapeHtml(String(d.costo_dia      || ''))) +
+             _f('Último Mantenimiento', 'ultimo_mantenimiento','date',  escapeHtml(d.ultimo_mantenimiento  || '')) +
+             _s('Estado',             'estado',               ['activo','inactivo'], d.estado || 'activo');
+    },
+
+    // ── Gastos ──────────────────────────────────────────────
+    gastos: function() {
+      return _f('Descripción',    'descripcion',   'text',     escapeHtml(d.descripcion   || ''), true) +
+             _f('Monto (S/.)',    'monto',         'number',   escapeHtml(String(d.monto   || '')), true) +
+             _f('Fecha del Gasto','fecha_gasto',   'date',     escapeHtml(d.fecha_gasto   || ''), true) +
+             _f('Categoría',      'categoria',     'text',     escapeHtml(d.categoria     || '')) +
+             _f('Campaña ID',     'campania_id',   'text',     escapeHtml(d.campania_id   || '')) +
+             _f('Campo ID',       'campo_id',      'text',     escapeHtml(d.campo_id      || '')) +
+             _f('Proveedor',      'proveedor',     'text',     escapeHtml(d.proveedor     || '')) +
+             _f('Comprobante',    'comprobante',   'text',     escapeHtml(d.comprobante   || '')) +
+             _f('Observaciones',  'observaciones', 'textarea', escapeHtml(d.observaciones || '')) +
+             _s('Estado',         'estado',        ['activo','inactivo'], d.estado || 'activo');
+    },
+
+    // ── Campañas ✅ CORREGIDO ────────────────────────────────
+    campanias: function() {
+      return _f('Nombre de Campaña',    'nombre',        'text',     escapeHtml(d.nombre        || ''), true) +
+             _f('Fecha de Inicio',      'fecha_inicio',  'date',     escapeHtml(d.fecha_inicio  || '')) +
+             _f('Fecha de Fin',         'fecha_fin',     'date',     escapeHtml(d.fecha_fin     || '')) +
+             _f('Presupuesto (S/.)',     'presupuesto',   'number',   escapeHtml(String(d.presupuesto  || ''))) +
+             _f('Costo Real (S/.)',      'costo_real',    'number',   escapeHtml(String(d.costo_real   || ''))) +
+             _f('Ingreso Real (S/.)',    'ingreso_real',  'number',   escapeHtml(String(d.ingreso_real || ''))) +
+             _s('Estado',               'estado',        ['planificada','en_progreso','finalizada'], d.estado || 'planificada') +
+             _f('Observaciones',        'observaciones', 'textarea', escapeHtml(d.observaciones || ''));
+    },
+
+    // ── Cosechas ────────────────────────────────────────────
+    cosechas: function() {
+      return _f('Campaña ID',       'campania_id',   'text',     escapeHtml(d.campania_id   || ''), true) +
+             _f('Fecha de Cosecha', 'fecha_cosecha', 'date',     escapeHtml(d.fecha_cosecha || '')) +
+             _f('Peso Neto (kg)',   'peso_neto_kg',  'number',   escapeHtml(String(d.peso_neto_kg || ''))) +
+             _f('Calidad',          'calidad',       'text',     escapeHtml(d.calidad       || '')) +
+             _f('Lote',             'lote',          'text',     escapeHtml(d.lote          || '')) +
+             _f('Observaciones',    'observaciones', 'textarea', escapeHtml(d.observaciones || ''));
+    },
+
+    // ── Ventas ──────────────────────────────────────────────
+    ventas: function() {
+      return _f('Campaña ID',          'campania_id',   'text',   escapeHtml(d.campania_id   || ''), true) +
+             _f('Comprador',           'comprador',     'text',   escapeHtml(d.comprador     || '')) +
+             _f('Fecha de Venta',      'fecha_venta',   'date',   escapeHtml(d.fecha_venta   || '')) +
+             _f('Cantidad (kg)',        'cantidad_kg',   'number', escapeHtml(String(d.cantidad_kg || ''))) +
+             _f('Precio por kg (S/.)', 'precio_kg',     'number', escapeHtml(String(d.precio_kg   || ''))) +
+             _f('Total Venta (S/.)',   'total_venta',   'number', escapeHtml(String(d.total_venta  || ''))) +
+             _s('Estado',              'estado',        ['pendiente_venta','vendida','anulada'], d.estado || 'pendiente_venta') +
+             _f('Observaciones',       'observaciones', 'textarea', escapeHtml(d.observaciones || ''));
+    }
+  };
+
+  return builders[type]
+    ? builders[type]()
+    : '<p style="color:#ba1a1a;padding:16px;">Tipo de formulario no reconocido: ' + escapeHtml(type) + '</p>';
+}
+
+// ── Helper: campo input / textarea ────────────────────────────
+function _f(label, name, type, value, required) {
+  var req     = required ? ' required' : '';
+  var reqMark = required ? '<span class="req">*</span>' : '';
+  if (type === 'textarea') {
+    return '<div class="form-modal__group">' +
+      '<label class="form-modal__label">' + label + reqMark + '</label>' +
+      '<textarea name="' + name + '" class="form-modal__textarea"' + req + ' rows="3">' +
+        value +
+      '</textarea>' +
+    '</div>';
+  }
+  return '<div class="form-modal__group">' +
+    '<label class="form-modal__label">' + label + reqMark + '</label>' +
+    '<input type="' + type + '" name="' + name + '" ' +
+      'class="form-modal__input" value="' + value + '"' + req + '>' +
+  '</div>';
+}
+
+// ── Helper: select ────────────────────────────────────────────
+function _s(label, name, options, selected) {
+  var opts = options.map(function(o) {
+    return '<option value="' + o + '"' + (o === selected ? ' selected' : '') + '>' + o + '</option>';
+  }).join('');
+  return '<div class="form-modal__group">' +
+    '<label class="form-modal__label">' + label + '</label>' +
+    '<select name="' + name + '" class="form-modal__select">' + opts + '</select>' +
+  '</div>';
+}
+</script>

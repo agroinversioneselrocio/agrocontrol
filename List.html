@@ -1,0 +1,120 @@
+<script>
+// ============================================================
+// LIST VIEW — Campos, Campañas, Cosechas, Ventas
+// ============================================================
+
+// ── Renderer principal ────────────────────────────────────────
+async function renderCamposList(container) {
+  container.innerHTML =
+    '<div class="list-header">' +
+      '<h2 class="list-title">Campos</h2>' +
+      '<div class="list-actions">' +
+        '<input type="text" class="search-input" placeholder="Buscar..."' +
+          ' onkeyup="searchList(this.value)">' +
+        '<button class="btn btn-primary" onclick="showForm(\'campos\')">' +
+          '<span class="material-symbols-outlined">add</span> Agregar Campo' +
+        '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="card"><div id="list-content">' +
+      '<div style="display:flex; align-items:center; justify-content:center; padding:40px;">' +
+        '<div class="spinner"></div>' +
+      '</div>' +
+    '</div></div>';
+
+  try {
+    var result = await runServer('webAppListCampos');
+    var items  = (result && result.ok) ? (result.data || []) : [];
+    _renderCamposRows(items);
+  } catch (err) {
+    // FIX: escapar err.message
+    var msg = escapeHtml(err ? (err.message || String(err)) : 'Error desconocido');
+    var el  = document.getElementById('list-content');
+    if (el) {
+      el.innerHTML =
+        '<div style="text-align:center; padding:40px; color:#ba1a1a;">' +
+          '<span class="material-symbols-outlined" ' +
+            'style="font-size:40px; display:block; margin-bottom:8px;">error</span>' +
+          'Error al cargar campos: ' + msg +
+        '</div>';
+    }
+  }
+}
+
+// ── Render de filas ───────────────────────────────────────────
+function _renderCamposRows(items) {
+  var el = document.getElementById('list-content');
+  if (!el) return;
+
+  if (!items || items.length === 0) {
+    el.innerHTML =
+      '<div style="text-align:center; padding:60px; color:var(--text-muted);">' +
+        '<span class="material-symbols-outlined" ' +
+          'style="font-size:48px; display:block; margin-bottom:12px;">map</span>' +
+        '<p style="font-size:16px; font-weight:600;">No hay campos registrados</p>' +
+        '<p style="font-size:13px; margin-top:4px;">' +
+          'Agrega el primer campo con el botón de arriba' +
+        '</p>' +
+      '</div>';
+    return;
+  }
+
+  var html =
+    '<div class="list-table-wrapper">' +
+      '<table class="list-table">' +
+        '<thead><tr>' +
+          '<th>ID</th>' +
+          '<th>Nombre</th>' +
+          '<th>Área (ha)</th>' +
+          '<th>Cultivo</th>' +
+          '<th>Estado</th>' +
+          '<th>Acciones</th>' +
+        '</tr></thead>' +
+        '<tbody>';
+
+  items.forEach(function(c) {
+    // FIX: escapar todos los campos de usuario
+    var id      = escapeHtml(String(c.campo_id         || ''));
+    var nombre  = escapeHtml(c.nombre                  || '-');
+    var area    = escapeHtml(String(c.area_hectareas    || '-'));
+    var cultivo = escapeHtml(c.tipo_cultivo             || '-');
+    var estado  = escapeHtml(c.estado                  || '-');
+
+    html +=
+      '<tr>' +
+        '<td>' + id      + '</td>' +
+        '<td>' + nombre  + '</td>' +
+        '<td>' + area    + '</td>' +
+        '<td>' + cultivo + '</td>' +
+        '<td>' +
+          '<span class="badge badge--' + estado + '">' + estado + '</span>' +
+        '</td>' +
+        '<td>' +
+          '<button class="list-action-btn" ' +
+            'onclick="showForm(\'campos\', \'' + id + '\')" ' +
+            'title="Editar">' +
+            '<span class="material-symbols-outlined">edit</span>' +
+          '</button>' +
+        '</td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ── Búsqueda local ────────────────────────────────────────────
+function searchList(value) {
+  var rows = document.querySelectorAll('#list-content tbody tr');
+  var q    = (value || '').toLowerCase();
+  rows.forEach(function(row) {
+    row.style.display =
+      row.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+  });
+}
+
+// ── Búsqueda global delegada ──────────────────────────────────
+function onGlobalSearch_campos(value) {
+  searchList(value);
+}
+</script>

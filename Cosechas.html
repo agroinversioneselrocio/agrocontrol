@@ -1,0 +1,402 @@
+<script>
+// ============================================================
+// COSECHAS.HTML — Vista completa de Gestión de Cosechas
+// ============================================================
+
+var _cosechasData         = [];
+var _cosechaSelected      = null;
+var _cosechasFilterEstado = '';
+
+function renderCosechasView(container) {
+  container.innerHTML = _cosechasShell();
+  return _cosechasLoadData();
+}
+
+function onGlobalSearch_cosechas(value) {
+  _cosechasRenderRows(_cosechasFilterRows(value));
+}
+
+function _cosechasShell() {
+  return [
+    '<div id="cosechas-metrics" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;">',
+      _cosechasMetricSkeleton(),_cosechasMetricSkeleton(),
+      _cosechasMetricSkeleton(),_cosechasMetricSkeleton(),
+    '</div>',
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap;">',
+      '<select id="cosechas-filter-estado" onchange="_cosechasOnFilterChange()"',
+        ' style="padding:8px 12px;border-radius:10px;border:1px solid #e3f3d2;background:white;font-size:13px;cursor:pointer;">',
+        '<option value="">Todos los estados</option>',
+        '<option value="pendiente_venta">Pendiente Venta</option>',
+        '<option value="vendida">Vendida</option>',
+        '<option value="anulada">Anulada</option>',
+      '</select>',
+      '<button class="btn btn-primary" onclick="_cosechasShowForm()">',
+        '<span class="material-symbols-outlined">add</span> Nueva Cosecha',
+      '</button>',
+    '</div>',
+    '<div id="cosechas-layout" style="display:grid;grid-template-columns:1fr;gap:16px;">',
+      '<div class="card" style="padding:0;overflow:hidden;"><div style="overflow-x:auto;">',
+        '<table class="list-table"><thead><tr>',
+          '<th>ID Cosecha</th><th>Campaña</th><th>Fecha</th>',
+          '<th>Jabas</th><th>Peso Neto</th><th>Costo</th>',
+          '<th>Total Venta</th><th>Estado</th>',
+          '<th style="width:80px;text-align:center;">Acciones</th>',
+        '</tr></thead>',
+        '<tbody id="cosechas-tbody">',
+          '<tr><td colspan="9" style="text-align:center;padding:48px;">',
+            '<div class="spinner" style="margin:0 auto;"></div>',
+          '</td></tr>',
+        '</tbody></table>',
+      '</div></div>',
+      '<div id="cosechas-detail-panel" style="display:none;"></div>',
+    '</div>',
+    '<div id="cosechas-modal-overlay" style="display:none;position:fixed;inset:0;',
+      'background:rgba(0,0,0,0.45);z-index:1000;align-items:center;',
+      'justify-content:center;padding:20px;backdrop-filter:blur(3px);">',
+      '<div id="cosechas-modal-box" style="background:white;border-radius:20px;',
+        'width:100%;max-width:540px;max-height:90vh;overflow-y:auto;',
+        'box-shadow:0 24px 48px rgba(0,0,0,0.2);"></div>',
+    '</div>'
+  ].join('');
+}
+
+function _cosechasMetricSkeleton() {
+  return '<div style="background:white;border-radius:16px;border:1px solid #e3f3d2;padding:18px;">' +
+    '<div class="skeleton-line" style="height:44px;border-radius:12px;margin:0;"></div></div>';
+}
+
+function _cosechasLoadData() {
+  return runServer('webAppListCosechas').then(function(result) {
+    _cosechasData = (result && result.ok) ? (result.data || []) : [];
+    _cosechasRenderMetrics(_cosechasData);
+    _cosechasRenderRows(_cosechasData);
+  }).catch(function(err) {
+    var tbody = document.getElementById('cosechas-tbody');
+    if (tbody) tbody.innerHTML =
+      '<tr><td colspan="9" style="text-align:center;padding:48px;color:#ba1a1a;">' +
+        escapeHtml(err ? (err.message||String(err)) : 'Error al cargar') +
+      '</td></tr>';
+  });
+}
+
+function _cosechasRenderMetrics(items) {
+  var pendientes = items.filter(function(c){ return c.estado==='pendiente_venta'; }).length;
+  var vendidas   = items.filter(function(c){ return c.estado==='vendida'; }).length;
+  var totalJabas = items.reduce(function(s,c){ return s+parseFloat(c.jabas||0); },0);
+  var totalKg    = items.reduce(function(s,c){ return s+parseFloat(c.peso_neto_kg||0); },0);
+
+  var metrics = [
+    { icon:'grass',         bg:'#e8f5e9', color:'#2e7d32', label:'Total Cosechas',   value: items.length },
+    { icon:'hourglass_top', bg:'#fef9c3', color:'#854d0e', label:'Pend. Venta',      value: pendientes },
+    { icon:'inventory_2',   bg:'#dbeafe', color:'#1e40af', label:'Total Jabas',      value: totalJabas.toLocaleString('es-PE') },
+    { icon:'scale',         bg:'#f0fdf4', color:'#166534', label:'Peso Neto Total',
+      value: totalKg.toLocaleString('es-PE',{minimumFractionDigits:1})+' kg' }
+  ];
+
+  var el = document.getElementById('cosechas-metrics');
+  if (!el) return;
+  el.innerHTML = metrics.map(function(m) {
+    return '<div style="background:white;border-radius:16px;border:1px solid #e3f3d2;' +
+      'padding:18px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">' +
+      '<div style="width:48px;height:48px;border-radius:12px;flex-shrink:0;' +
+        'display:flex;align-items:center;justify-content:center;background:'+m.bg+';">' +
+        '<span class="material-symbols-outlined" style="color:'+m.color+';">'+m.icon+'</span>' +
+      '</div><div>' +
+        '<p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;' +
+          'letter-spacing:0.5px;margin:0 0 2px;">'+escapeHtml(m.label)+'</p>' +
+        '<p style="font-size:20px;font-weight:800;color:#001f12;margin:0;font-family:Manrope,sans-serif;">' +
+          escapeHtml(String(m.value))+'</p>' +
+      '</div></div>';
+  }).join('');
+}
+
+function _cosechasRenderRows(items) {
+  var tbody = document.getElementById('cosechas-tbody');
+  if (!tbody) return;
+
+  if (!items || items.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="9" style="text-align:center;padding:56px;color:var(--text-muted);">' +
+        '<span class="material-symbols-outlined" style="font-size:48px;display:block;margin-bottom:12px;color:#c8e6c9;">grass</span>' +
+        '<p style="font-weight:600;font-size:15px;margin:0 0 4px;">No hay cosechas registradas</p>' +
+        '<p style="font-size:13px;margin:0;">Registra la primera cosecha con "Nueva Cosecha"</p>' +
+      '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = items.map(function(c) {
+    var id       = escapeHtml(String(c.cosecha_id    ||''));
+    var campania = escapeHtml(c.campania_id           ||'-');
+    var fecha    = escapeHtml(c.fecha_cosecha         ||'-');
+    var jabas    = parseFloat(c.jabas                 ||0);
+    var pesoN    = parseFloat(c.peso_neto_kg          ||0);
+    var costo    = parseFloat(c.costo_cosecha         ||0);
+    var totalV   = parseFloat(c.total_venta           ||0);
+    var estado   = escapeHtml(c.estado                ||'');
+    var isAct    = _cosechaSelected && _cosechaSelected.cosecha_id === c.cosecha_id;
+
+    return '<tr style="cursor:pointer;'+(isAct?'background:#f0fdf4;':'')+'"' +
+      ' onclick="_cosechasShowDetail(\''+id+'\')">' +
+      '<td><strong style="color:var(--primary-color);font-size:12px;">'+id+'</strong></td>' +
+      '<td><span style="background:#f0fdf4;color:#166534;padding:3px 10px;' +
+        'border-radius:20px;font-size:11px;font-weight:600;">'+campania+'</span></td>' +
+      '<td>'+fecha+'</td>' +
+      '<td><strong>'+jabas.toLocaleString('es-PE')+'</strong></td>' +
+      '<td><strong>'+pesoN.toLocaleString('es-PE',{minimumFractionDigits:1})+'</strong> kg</td>' +
+      '<td>S/ '+costo.toLocaleString('es-PE',{minimumFractionDigits:2})+'</td>' +
+      '<td style="font-weight:700;color:#166534;">' +
+        (totalV > 0 ? 'S/ '+totalV.toLocaleString('es-PE',{minimumFractionDigits:2}) : '-') +
+      '</td>' +
+      '<td><span class="badge badge--'+estado+'">'+estado.replace('_',' ')+'</span></td>' +
+      '<td style="text-align:center;"><div style="display:flex;gap:6px;justify-content:center;">' +
+        '<button class="btn btn-secondary" style="padding:5px 8px;" ' +
+          'onclick="event.stopPropagation();_cosechasShowForm(\''+id+'\')" title="Editar">' +
+          '<span class="material-symbols-outlined" style="font-size:15px;">edit</span></button>' +
+        '<button class="btn btn-secondary" style="padding:5px 8px;color:#991b1b;" ' +
+          'onclick="event.stopPropagation();_cosechasConfirmDelete(\''+id+'\')" title="Eliminar">' +
+          '<span class="material-symbols-outlined" style="font-size:15px;">delete</span></button>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+function _cosechasShowDetail(id) {
+  var c = _cosechasData.find(function(x){ return String(x.cosecha_id)===String(id); });
+  if (!c) return;
+  _cosechaSelected = c;
+
+  var layout = document.getElementById('cosechas-layout');
+  if (layout) layout.style.gridTemplateColumns = '1fr 340px';
+
+  var panel = document.getElementById('cosechas-detail-panel');
+  if (!panel) return;
+  panel.style.display = 'block';
+
+  var estado   = escapeHtml(c.estado         ||'');
+  var idSafe   = escapeHtml(String(c.cosecha_id||''));
+  var campania = escapeHtml(c.campania_id     ||'-');
+  var campo    = escapeHtml(c.campo_id        ||'-');
+  var fecha    = escapeHtml(c.fecha_cosecha   ||'-');
+  var obs      = escapeHtml(c.observaciones   ||'Sin observaciones');
+  var jabas    = parseFloat(c.jabas           ||0);
+  var pesoBruto= parseFloat(c.peso_bruto_kg   ||0);
+  var tara     = parseFloat(c.tara_kg         ||0);
+  var pesoNeto = parseFloat(c.peso_neto_kg    ||0);
+  var costo    = parseFloat(c.costo_cosecha   ||0);
+  var precioKg = parseFloat(c.precio_kg       ||0);
+  var totalV   = parseFloat(c.total_venta     ||0);
+  var fmt = function(n){ return 'S/ '+n.toLocaleString('es-PE',{minimumFractionDigits:2}); };
+
+  panel.innerHTML =
+    '<div class="card" style="position:sticky;top:0;padding:0;overflow:hidden;">' +
+      '<div style="background:linear-gradient(135deg,#003622,#005c38);padding:20px;color:white;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+          '<div>' +
+            '<p style="font-size:10px;opacity:0.7;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px;">Cosecha</p>' +
+            '<h3 style="font-family:Manrope;font-size:16px;font-weight:800;margin:0 0 6px;">'+idSafe+'</h3>' +
+            '<span class="badge badge--'+estado+'">'+estado.replace('_',' ')+'</span>' +
+          '</div>' +
+          '<button onclick="_cosechasCloseDetail()" ' +
+            'style="background:rgba(255,255,255,0.15);border:none;color:white;' +
+            'border-radius:8px;padding:6px;cursor:pointer;display:flex;align-items:center;">' +
+            '<span class="material-symbols-outlined" style="font-size:18px;">close</span>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+
+      // Pesos
+      '<div style="padding:16px 20px;background:#f0fdf4;border-bottom:1px solid #e3f3d2;">' +
+        '<p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;">Producción</p>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+          _cosechasStatCard('Jabas',       jabas.toLocaleString('es-PE'),       '#1e40af') +
+          _cosechasStatCard('Peso Bruto',  pesoBruto.toFixed(1)+' kg',          '#92400e') +
+          _cosechasStatCard('Tara',        tara.toFixed(1)+' kg',               '#6b7280') +
+          _cosechasStatCard('Peso Neto',   pesoNeto.toFixed(1)+' kg',           '#166534') +
+        '</div>' +
+      '</div>' +
+
+      // Financiero
+      '<div style="padding:16px 20px;border-bottom:1px solid #e3f3d2;">' +
+        '<p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 10px;">Financiero</p>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+          _cosechasStatCard('Costo Cosecha', fmt(costo),   '#92400e') +
+          _cosechasStatCard('Precio x kg',   fmt(precioKg),'#1e40af') +
+          _cosechasStatCard('Total Venta',   fmt(totalV),  '#166534') +
+        '</div>' +
+      '</div>' +
+
+      '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;">' +
+        _cosechasDetailRow('calendar_today','Fecha',    fecha) +
+        _cosechasDetailRow('calendar_today','Campaña',  campania) +
+        _cosechasDetailRow('map',           'Campo',    campo) +
+        _cosechasDetailRow('notes',         'Obs.',     obs) +
+      '</div>' +
+
+      '<div style="padding:16px 20px;border-top:1px solid #e3f3d2;display:flex;gap:8px;">' +
+        '<button class="btn btn-primary" style="flex:1;" onclick="_cosechasShowForm(\''+idSafe+'\')">' +
+          '<span class="material-symbols-outlined">edit</span> Editar' +
+        '</button>' +
+        (c.estado === 'pendiente_venta' ?
+          '<button class="btn btn-secondary" style="flex:1;" ' +
+            'onclick="navigateTo(\'ventas\',\'Ventas\',\'Comercialización\')">' +
+            '<span class="material-symbols-outlined">sell</span> Vender' +
+          '</button>' : '') +
+      '</div>' +
+    '</div>';
+
+  _cosechasRenderRows(_cosechasFilterRows());
+}
+
+function _cosechasStatCard(label, value, color) {
+  return '<div style="background:white;border-radius:10px;padding:10px 12px;border:1px solid #e3f3d2;">' +
+    '<p style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 2px;">'+escapeHtml(label)+'</p>' +
+    '<p style="font-size:15px;font-weight:700;color:'+color+';margin:0;font-family:Manrope;">'+escapeHtml(value)+'</p>' +
+  '</div>';
+}
+
+function _cosechasDetailRow(icon, label, value) {
+  return '<div style="display:flex;align-items:flex-start;gap:12px;">' +
+    '<span class="material-symbols-outlined" style="font-size:18px;color:#6b7280;margin-top:2px;flex-shrink:0;">'+icon+'</span>' +
+    '<div>' +
+      '<p style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 2px;font-weight:600;">'+escapeHtml(label)+'</p>' +
+      '<p style="font-size:14px;color:#1a2e1a;margin:0;font-weight:500;">'+value+'</p>' +
+    '</div>' +
+  '</div>';
+}
+
+function _cosechasCloseDetail() {
+  _cosechaSelected = null;
+  var layout = document.getElementById('cosechas-layout');
+  if (layout) layout.style.gridTemplateColumns = '1fr';
+  var panel = document.getElementById('cosechas-detail-panel');
+  if (panel) panel.style.display = 'none';
+  _cosechasRenderRows(_cosechasFilterRows());
+}
+
+function _cosechasOnFilterChange() {
+  var sel = document.getElementById('cosechas-filter-estado');
+  _cosechasFilterEstado = sel ? sel.value : '';
+  _cosechasRenderRows(_cosechasFilterRows());
+}
+
+function _cosechasFilterRows(search) {
+  var q = (search||'').toLowerCase();
+  return _cosechasData.filter(function(c) {
+    var mE = !_cosechasFilterEstado || c.estado === _cosechasFilterEstado;
+    var mS = !q ||
+      String(c.cosecha_id  ||'').toLowerCase().indexOf(q) >= 0 ||
+      String(c.campania_id ||'').toLowerCase().indexOf(q) >= 0 ||
+      String(c.campo_id    ||'').toLowerCase().indexOf(q) >= 0;
+    return mE && mS;
+  });
+}
+
+function _cosechasShowForm(id) {
+  var c      = id ? _cosechasData.find(function(x){ return String(x.cosecha_id)===String(id); }) : null;
+  var isEdit = !!c;
+  var overlay = document.getElementById('cosechas-modal-overlay');
+  var box     = document.getElementById('cosechas-modal-box');
+  if (!overlay || !box) return;
+
+  var campania = escapeHtml(c ? (c.campania_id   ||'') : '');
+  var campo    = escapeHtml(c ? (c.campo_id      ||'') : '');
+  var fecha    = escapeHtml(c ? (c.fecha_cosecha ||'') : '');
+  var jabas    = escapeHtml(c ? (c.jabas         ||'') : '');
+  var pesoBruto= escapeHtml(c ? (c.peso_bruto_kg ||'') : '');
+  var costo    = escapeHtml(c ? (c.costo_cosecha ||'') : '');
+  var precioKg = escapeHtml(c ? (c.precio_kg     ||'') : '');
+  var obs      = escapeHtml(c ? (c.observaciones ||'') : '');
+  var idSafe   = escapeHtml(id||'');
+
+  // Opciones de campañas
+  var campOpts = '<option value="">-- Seleccionar campaña --</option>';
+  if (typeof _campaniasData !== 'undefined') {
+    _campaniasData.filter(function(x){ return x.estado !== 'finalizada'; }).forEach(function(x) {
+      var sel = campania === escapeHtml(x.campania_id) ? ' selected' : '';
+      campOpts += '<option value="'+escapeHtml(x.campania_id)+'"'+sel+'>'+escapeHtml(x.nombre)+'</option>';
+    });
+  }
+
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;' +
+      'padding:20px 24px 16px;border-bottom:1px solid #e3f3d2;' +
+      'position:sticky;top:0;background:white;z-index:1;border-radius:20px 20px 0 0;">' +
+      '<h3 style="font-family:Manrope;font-size:18px;font-weight:700;color:var(--primary-color);margin:0;">' +
+        (isEdit ? 'Editar Cosecha' : 'Nueva Cosecha') +
+      '</h3>' +
+      '<button onclick="_cosechasCloseForm()" ' +
+        'style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;border-radius:8px;">' +
+        '<span class="material-symbols-outlined">close</span>' +
+      '</button>' +
+    '</div>' +
+    '<form id="cosechas-form" onsubmit="return false;" ' +
+      'style="padding:20px 24px;display:flex;flex-direction:column;gap:16px;">' +
+
+      '<div style="display:flex;flex-direction:column;gap:6px;">' +
+        '<label style="font-family:Poppins;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#1a2e1a;">' +
+          'Campaña <span style="color:#ba1a1a;">*</span></label>' +
+        '<select id="cosechas-f-campania" ' +
+          'style="padding:10px 13px;border-radius:10px;border:1px solid #c0c9c1;background:white;font-size:14px;color:#1a2e1a;">' +
+          campOpts +
+        '</select>' +
+      '</div>' +
+
+      _cosechasFormGroup('Fecha de Cosecha','cosechas-f-fecha','date',fecha,true) +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+        _cosechasFormGroup('Jabas','cosechas-f-jabas','number',jabas,true,'0','min="0"') +
+        _cosechasFormGroup('Peso Bruto (kg)','cosechas-f-pesobruto','number',pesoBruto,true,'0.0','step="0.1" min="0"') +
+      '</div>' +
+
+      '<div style="background:#f0fdf4;border-radius:10px;padding:12px;border:1px solid #c8e6c9;">' +
+        '<p style="font-size:11px;color:#166534;font-weight:600;margin:0 0 4px;">ℹ️ Cálculo automático</p>' +
+        '<p style="font-size:12px;color:#6b7280;margin:0;">Tara = Jabas × 0.35 kg · Peso Neto = Peso Bruto − Tara</p>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+        _cosechasFormGroup('Costo Cosecha (S/)','cosechas-f-costo','number',costo,false,'0.00','step="0.01" min="0"') +
+        _cosechasFormGroup('Precio x kg (S/)','cosechas-f-precio','number',precioKg,false,'0.00','step="0.01" min="0"') +
+      '</div>' +
+
+      '<div style="display:flex;flex-direction:column;gap:6px;">' +
+        '<label style="font-family:Poppins;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#1a2e1a;">Observaciones</label>' +
+        '<textarea id="cosechas-f-obs" rows="2" ' +
+          'style="padding:10px 13px;border-radius:10px;border:1px solid #c0c9c1;background:white;' +
+          'font-size:14px;font-family:Inter;color:#1a2e1a;resize:vertical;">'+obs+'</textarea>' +
+      '</div>' +
+
+      '<div style="display:flex;gap:10px;padding-top:8px;">' +
+        '<button type="button" class="btn btn-secondary" style="flex:1;" onclick="_cosechasCloseForm()">Cancelar</button>' +
+        '<button type="button" class="btn btn-primary" style="flex:1;" id="cosechas-submit-btn" ' +
+          'onclick="_cosechasSubmitForm(\''+idSafe+'\')">' +
+          (isEdit ? 'Guardar Cambios' : 'Registrar Cosecha') +
+        '</button>' +
+      '</div>' +
+    '</form>';
+
+  overlay.style.display = 'flex';
+}
+
+function _cosechasFormGroup(label, id, type, value, required, placeholder, extra) {
+  return '<div style="display:flex;flex-direction:column;gap:6px;">' +
+    '<label for="'+id+'" style="font-family:Poppins;font-size:11px;font-weight:600;' +
+      'text-transform:uppercase;letter-spacing:0.5px;color:#1a2e1a;">' +
+      escapeHtml(label)+(required?'<span style="color:#ba1a1a;margin-left:2px;">*</span>':'') +
+    '</label>' +
+    '<input type="'+type+'" id="'+id+'" value="'+value+'" ' +
+      'placeholder="'+escapeHtml(placeholder||'')+'" ' +
+      (required?'required ':'')+
+      (extra||'')+
+      ' style="padding:10px 13px;border-radius:10px;border:1px solid #c0c9c1;' +
+      'background:white;font-size:14px;font-family:Inter;color:#1a2e1a;' +
+      'box-sizing:border-box;width:100%;">' +
+  '</div>';
+}
+
+function _cosechasCloseForm() {
+  var overlay = document.getElementById('cosechas-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function _cosechasSubmitForm(id) {
+  var campania  = (document.getElementById('cosechas-f-campania') ||{}).value ||'';
+  var fecha     = (document.

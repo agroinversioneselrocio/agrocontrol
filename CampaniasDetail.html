@@ -1,0 +1,594 @@
+<script>
+(function () {
+
+  // ══════════════════════════════════════════════════════════
+  // HTML MODALES - DETALLE Y NUEVO
+  // ══════════════════════════════════════════════════════════
+  function _injectModalesHTML() {
+    if (document.getElementById('cpn-modal-detail')) return;
+
+    var modalesHTML = `
+    <!-- ── MODAL DETALLE / EDITAR ─────────────────────────── -->
+    <div id="cpn-modal-detail" class="cpn-modal-overlay" onclick="campaniasHandleOverlay(event,'cpn-modal-detail')">
+      <div class="cpn-modal-box bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+
+        <div class="bg-primary-container px-7 py-6 flex-shrink-0">
+          <button onclick="campaniasCloseModal('cpn-modal-detail')"
+            class="absolute top-4 right-4 text-white/60 hover:text-white transition-colors">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <h2 class="font-headline font-extrabold text-2xl text-white tracking-tight" id="cpn-cd-title">Detalle de Campaña</h2>
+          <p class="text-white/70 text-xs mt-1" id="cpn-cd-subtitle">—</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-6 py-6 bg-surface space-y-4">
+
+          <div class="space-y-1">
+            <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Nombre de Campaña</label>
+            <input id="cpn-cd-nombre" type="text" class="cpn-field-input"/>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Fecha de Inicio</label>
+              <input id="cpn-cd-fecha-inicio" type="date" class="cpn-field-input" oninput="campaniasCalcDuracionDetail()"/>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Fecha de Fin</label>
+              <input id="cpn-cd-fecha-fin" type="date" class="cpn-field-input" oninput="campaniasCalcDuracionDetail()"/>
+            </div>
+            <div class="md:col-span-2">
+              <p id="cpn-cd-duracion" class="text-xs font-semibold text-secondary px-3 py-1.5 bg-primary-container/10 rounded-lg w-fit" style="display:none;"></p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Presupuesto (S/.)</label>
+              <input id="cpn-cd-presupuesto" type="number" step="0.01" min="0" class="cpn-field-input"/>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Costo Real (S/.)</label>
+              <input id="cpn-cd-costo-real" type="number" step="0.01" min="0" class="cpn-field-input" oninput="campaniasCalcUtilidadDetail()"/>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Ingreso Real (S/.)</label>
+              <input id="cpn-cd-ingreso-real" type="number" step="0.01" min="0" class="cpn-field-input" oninput="campaniasCalcUtilidadDetail()"/>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Utilidad (S/.)</label>
+              <input id="cpn-cd-utilidad" type="number" step="0.01" class="cpn-field-input" readonly/>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Estado</label>
+              <select id="cpn-cd-estado" class="cpn-field-input cpn-field-select">
+                <option value="planificada">Planificada</option>
+                <option value="en_progreso">En Progreso</option>
+                <option value="finalizada">Finalizada</option>
+                <option value="anulada">Anulada</option>
+              </select>
+            </div>
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Observaciones</label>
+              <textarea id="cpn-cd-observaciones" rows="2" class="cpn-field-input" style="resize:vertical;"></textarea>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 pt-2 border-t border-outline-variant/15">
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Fecha Creación</label>
+              <input id="cpn-cd-fecha-creacion" type="text" readonly class="cpn-field-input"/>
+            </div>
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Última Actualización</label>
+              <input id="cpn-cd-fecha-actualizacion" type="text" readonly class="cpn-field-input"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-outline-variant/15 flex items-center justify-between gap-3 bg-surface flex-shrink-0">
+          <button onclick="campaniasConfirmDelete()"
+            class="flex items-center gap-2 text-error font-bold text-sm hover:bg-error-container/20 px-4 py-2 rounded-lg transition-colors">
+            <span class="material-symbols-outlined text-lg">delete</span> Anular
+          </button>
+          <div class="flex items-center gap-3">
+            <button id="cpn-cd-btn-cancel" onclick="campaniasHandleDetailCancel()"
+              class="px-5 py-2.5 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors">Cerrar</button>
+            <button id="cpn-cd-btn-primary" onclick="campaniasHandleDetailPrimary()"
+              class="px-7 py-2.5 bg-primary-container text-white rounded-xl font-bold text-sm shadow-md hover:scale-[1.02] active:scale-95 transition-all">Editar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL NUEVA CAMPAÑA ────────────────────────────── -->
+    <div id="cpn-modal-new" class="cpn-modal-overlay" onclick="campaniasHandleOverlay(event,'cpn-modal-new')">
+      <div class="cpn-modal-box bg-white w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative">
+
+        <div class="bg-primary-container px-7 py-6 flex-shrink-0">
+          <button onclick="campaniasCloseModal('cpn-modal-new')"
+            class="absolute top-4 right-4 text-white/60 hover:text-white transition-colors">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <h2 class="font-headline font-extrabold text-2xl text-white tracking-tight">Nueva Campaña</h2>
+          <p class="text-white/70 text-xs mt-1">Complete la información para registrar la campaña.</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-6 py-6 bg-surface space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Nombre *</label>
+              <input id="cpn-cn-nombre" type="text" placeholder="Ej. Campaña Primavera 2026" class="cpn-field-input"/>
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Fecha de Inicio</label>
+              <input id="cpn-cn-fecha-inicio" type="date" class="cpn-field-input" oninput="campaniasCalcDuracionNew()"/>
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Fecha de Fin</label>
+              <input id="cpn-cn-fecha-fin" type="date" class="cpn-field-input" oninput="campaniasCalcDuracionNew()"/>
+            </div>
+
+            <div id="cpn-cn-duracion-wrap" class="md:col-span-2" style="display:none;">
+              <p id="cpn-cn-duracion" class="text-xs font-semibold text-secondary px-3 py-1.5 bg-primary-container/10 rounded-lg w-fit"></p>
+            </div>
+
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Presupuesto Estimado (S/.)</label>
+              <input id="cpn-cn-presupuesto" type="number" step="0.01" min="0" placeholder="0.00" class="cpn-field-input"/>
+            </div>
+
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Estado Inicial</label>
+              <select id="cpn-cn-estado" class="cpn-field-input cpn-field-select">
+                <option value="planificada">Planificada</option>
+                <option value="en_progreso">En Progreso</option>
+                <option value="finalizada">Finalizada</option>
+                <option value="anulada">Anulada</option>
+              </select>
+            </div>
+
+            <div class="space-y-1 md:col-span-2">
+              <label class="block text-[10px] font-bold uppercase tracking-widest text-outline">Observaciones</label>
+              <textarea id="cpn-cn-observaciones" rows="2" placeholder="Notas adicionales..." class="cpn-field-input" style="resize:vertical;"></textarea>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-outline-variant/15 flex items-center justify-end gap-3 bg-surface flex-shrink-0">
+          <button onclick="campaniasCloseModal('cpn-modal-new')"
+            class="px-5 py-2.5 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors">Cancelar</button>
+          <button id="cpn-cn-btn-save" onclick="campaniasSaveNew()"
+            class="px-8 py-2.5 bg-primary-container text-white rounded-xl font-bold text-sm shadow-md hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2">
+            <span class="material-symbols-outlined text-base">save</span> Guardar Campaña
+          </button>
+        </div>
+      </div>
+    </div>
+    `;
+
+    var container = document.getElementById('page-content');
+    if (!container) return;
+
+    var temp = document.createElement('div');
+    temp.innerHTML = modalesHTML;
+
+    while (temp.firstChild) {
+      container.appendChild(temp.firstChild);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // MODAL DETALLE - ABRIR / EDITAR
+  // ══════════════════════════════════════════════════════════
+  window.campaniasOpenDetail = function(id) {
+    _injectModalesHTML();
+
+    var c = (window._campaniasData || []).find(function(x) {
+      return String(x.campania_id) === String(id);
+    });
+    if (!c) return;
+
+    window._currentId  = id;
+    window._detailMode = 'view';
+
+    _populateDetail(c);
+    _setDetailReadonly(true);
+    _setText('cpn-cd-btn-primary', 'Editar');
+    _setText('cpn-cd-btn-cancel', 'Cerrar');
+    campaniasOpenModal('cpn-modal-detail');
+  };
+
+  window.campaniasOpenEdit = function(id) {
+    _injectModalesHTML();
+
+    var c = (window._campaniasData || []).find(function(x) {
+      return String(x.campania_id) === String(id);
+    });
+    if (!c) return;
+
+    window._currentId  = id;
+    window._detailMode = 'edit';
+
+    _populateDetail(c);
+    _setDetailReadonly(false);
+    _setText('cpn-cd-btn-primary', 'Guardar Cambios');
+    _setText('cpn-cd-btn-cancel', 'Cancelar');
+    campaniasOpenModal('cpn-modal-detail');
+  };
+
+  function _populateDetail(c) {
+    _setText('cpn-cd-title', c.nombre || '—');
+    _setText('cpn-cd-subtitle', 'ID: ' + (c.campania_id || '—'));
+
+    _setVal('cpn-cd-nombre', c.nombre);
+    _setVal('cpn-cd-fecha-inicio', _toInputDate(c.fecha_inicio));
+    _setVal('cpn-cd-fecha-fin', _toInputDate(c.fecha_fin));
+    _setVal('cpn-cd-presupuesto', c.presupuesto);
+    _setVal('cpn-cd-costo-real', c.costo_real);
+    _setVal('cpn-cd-ingreso-real', c.ingreso_real);
+    _setVal('cpn-cd-utilidad', c.utilidad);
+    _setVal('cpn-cd-observaciones', c.observaciones);
+    _setVal('cpn-cd-fecha-creacion', _formatDate(c.fecha_creacion));
+    _setVal('cpn-cd-fecha-actualizacion', _formatDate(c.fecha_actualizacion));
+
+    var estadoEl = document.getElementById('cpn-cd-estado');
+    if (estadoEl) estadoEl.value = c.estado || 'planificada';
+
+    _updateDuracionDisplay('cpn-cd-fecha-inicio', 'cpn-cd-fecha-fin', 'cpn-cd-duracion');
+    window.campaniasCalcUtilidadDetail();
+  }
+
+  function _setDetailReadonly(ro) {
+    [
+      'cpn-cd-nombre',
+      'cpn-cd-fecha-inicio',
+      'cpn-cd-fecha-fin',
+      'cpn-cd-presupuesto',
+      'cpn-cd-costo-real',
+      'cpn-cd-ingreso-real'
+    ].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (ro) el.setAttribute('readonly', '');
+      else el.removeAttribute('readonly');
+    });
+
+    var estadoEl = document.getElementById('cpn-cd-estado');
+    var obsEl    = document.getElementById('cpn-cd-observaciones');
+
+    if (estadoEl) estadoEl.disabled = ro;
+    if (obsEl) obsEl.disabled = ro;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // MODAL DETALLE - HANDLERS
+  // ══════════════════════════════════════════════════════════
+  window.campaniasHandleDetailPrimary = function() {
+    if (window._detailMode === 'view') {
+      window._detailMode = 'edit';
+      _setDetailReadonly(false);
+      _setText('cpn-cd-btn-primary', 'Guardar Cambios');
+      _setText('cpn-cd-btn-cancel', 'Cancelar');
+      return;
+    }
+
+    _saveDetail();
+  };
+
+  window.campaniasHandleDetailCancel = function() {
+    if (window._detailMode === 'edit') {
+      var c = (window._campaniasData || []).find(function(x) {
+        return String(x.campania_id) === String(window._currentId);
+      });
+
+      if (c) {
+        window._detailMode = 'view';
+        _populateDetail(c);
+        _setDetailReadonly(true);
+        _setText('cpn-cd-btn-primary', 'Editar');
+        _setText('cpn-cd-btn-cancel', 'Cerrar');
+        return;
+      }
+    }
+
+    campaniasCloseModal('cpn-modal-detail');
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // GUARDAR DETALLE
+  // ══════════════════════════════════════════════════════════
+  function _saveDetail() {
+    var btn = document.getElementById('cpn-cd-btn-primary');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+    }
+
+    var ingreso  = parseFloat(_getVal('cpn-cd-ingreso-real')) || 0;
+    var costo    = parseFloat(_getVal('cpn-cd-costo-real')) || 0;
+    var utilidad = ingreso - costo;
+
+    var payload = {
+      campania_id:   window._currentId,
+      nombre:        (_getVal('cpn-cd-nombre') || '').trim(),
+      fecha_inicio:  _getVal('cpn-cd-fecha-inicio'),
+      fecha_fin:     _getVal('cpn-cd-fecha-fin'),
+      presupuesto:   parseFloat(_getVal('cpn-cd-presupuesto')) || 0,
+      costo_real:    costo,
+      ingreso_real:  ingreso,
+      utilidad:      utilidad,
+      estado:        _getVal('cpn-cd-estado') || 'planificada',
+      observaciones: _getVal('cpn-cd-observaciones')
+    };
+
+    if (!payload.nombre) {
+      _showToast('error', 'El nombre de la campaña es obligatorio');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Guardar Cambios';
+      }
+      return;
+    }
+
+    runServer('webAppSaveCampania', payload)
+      .then(function(result) {
+        if (!result || result.ok === false) {
+          throw new Error(result && result.message ? result.message : 'No se pudo actualizar la campaña');
+        }
+
+        campaniasCloseModal('cpn-modal-detail');
+        _showToast('check_circle', 'Campaña actualizada correctamente');
+        return _reloadCampanias();
+      })
+      .catch(function(err) {
+        _showToast('error', 'Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .finally(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar Cambios';
+        }
+      });
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // CÁLCULOS
+  // ══════════════════════════════════════════════════════════
+  window.campaniasCalcUtilidadDetail = function() {
+    var ingreso  = parseFloat(_getVal('cpn-cd-ingreso-real')) || 0;
+    var costo    = parseFloat(_getVal('cpn-cd-costo-real')) || 0;
+    _setVal('cpn-cd-utilidad', (ingreso - costo).toFixed(2));
+  };
+
+  window.campaniasCalcDuracionDetail = function() {
+    _updateDuracionDisplay('cpn-cd-fecha-inicio', 'cpn-cd-fecha-fin', 'cpn-cd-duracion');
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // ELIMINAR / ANULAR
+  // ══════════════════════════════════════════════════════════
+  window.campaniasConfirmDelete = function() {
+    campaniasDeleteFromRow(window._currentId);
+  };
+
+  window.campaniasDeleteFromRow = function(id) {
+    if (!confirm('¿Anular esta campaña?')) return;
+
+    runServer('webAppDeleteCampania', { id: id })
+      .then(function(result) {
+        if (!result || result.ok === false) {
+          throw new Error(result && result.message ? result.message : 'No se pudo anular la campaña');
+        }
+
+        campaniasCloseModal('cpn-modal-detail');
+        _showToast('delete', 'Campaña anulada');
+        return _reloadCampanias();
+      })
+      .catch(function(err) {
+        _showToast('error', 'Error al anular: ' + (err && err.message ? err.message : String(err)));
+      });
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // NUEVA CAMPAÑA
+  // ══════════════════════════════════════════════════════════
+  window.campaniasOpenNew = function() {
+    _injectModalesHTML();
+
+    [
+      'cpn-cn-nombre',
+      'cpn-cn-fecha-inicio',
+      'cpn-cn-fecha-fin',
+      'cpn-cn-presupuesto',
+      'cpn-cn-observaciones'
+    ].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    var estadoEl = document.getElementById('cpn-cn-estado');
+    if (estadoEl) estadoEl.value = 'planificada';
+
+    var wrap = document.getElementById('cpn-cn-duracion-wrap');
+    if (wrap) wrap.style.display = 'none';
+
+    campaniasOpenModal('cpn-modal-new');
+  };
+
+  window.campaniasSaveNew = function() {
+    var nombre = (_getVal('cpn-cn-nombre') || '').trim();
+    if (!nombre) {
+      _showToast('error', 'El nombre de la campaña es obligatorio');
+      return;
+    }
+
+    var btn = document.getElementById('cpn-cn-btn-save');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = 'Guardando...';
+    }
+
+    var payload = {
+      nombre:        nombre,
+      fecha_inicio:  _getVal('cpn-cn-fecha-inicio'),
+      fecha_fin:     _getVal('cpn-cn-fecha-fin'),
+      presupuesto:   parseFloat(_getVal('cpn-cn-presupuesto')) || 0,
+      costo_real:    0,
+      ingreso_real:  0,
+      utilidad:      0,
+      estado:        _getVal('cpn-cn-estado') || 'planificada',
+      observaciones: _getVal('cpn-cn-observaciones')
+    };
+
+    runServer('webAppSaveCampania', payload)
+      .then(function(result) {
+        if (!result || result.ok === false) {
+          throw new Error(result && result.message ? result.message : 'No se pudo crear la campaña');
+        }
+
+        campaniasCloseModal('cpn-modal-new');
+        _showToast('check_circle', 'Campaña creada correctamente');
+        return _reloadCampanias();
+      })
+      .catch(function(err) {
+        _showToast('error', 'Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .finally(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-outlined text-base">save</span> Guardar Campaña';
+        }
+      });
+  };
+
+  window.campaniasCalcDuracionNew = function() {
+    var wrap = document.getElementById('cpn-cn-duracion-wrap');
+    _updateDuracionDisplay('cpn-cn-fecha-inicio', 'cpn-cn-fecha-fin', 'cpn-cn-duracion');
+
+    var dias = _calcDias(_getVal('cpn-cn-fecha-inicio'), _getVal('cpn-cn-fecha-fin'));
+    if (wrap) wrap.style.display = dias > 0 ? 'block' : 'none';
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // HELPERS MODAL
+  // ══════════════════════════════════════════════════════════
+  window.campaniasOpenModal = function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+  };
+
+  window.campaniasCloseModal = function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+  };
+
+  window.campaniasHandleOverlay = function(e, id) {
+    if (e.target === document.getElementById(id)) {
+      campaniasCloseModal(id);
+    }
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // HELPERS FECHA
+  // ══════════════════════════════════════════════════════════
+  function _formatDate(val) {
+    if (typeof window.campaniasFormatDate === 'function') {
+      return window.campaniasFormatDate(val);
+    }
+    if (!val) return '—';
+    var d = new Date(val);
+    if (isNaN(d)) return String(val);
+    return d.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  function _toInputDate(val) {
+    if (!val) return '';
+    var d = new Date(val);
+    if (isNaN(d)) return '';
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mm + '-' + dd;
+  }
+
+  function _calcDias(inicio, fin) {
+    if (!inicio || !fin) return 0;
+    var d1 = new Date(inicio);
+    var d2 = new Date(fin);
+    if (isNaN(d1) || isNaN(d2) || d2 <= d1) return 0;
+    return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+  }
+
+  function _updateDuracionDisplay(inicioId, finId, displayId) {
+    var dias = _calcDias(_getVal(inicioId), _getVal(finId));
+    var el   = document.getElementById(displayId);
+    if (!el) return;
+
+    if (dias > 0) {
+      var meses = Math.floor(dias / 30);
+      var texto = dias + ' días' + (meses > 0 ? ' (' + meses + ' mes' + (meses > 1 ? 'es' : '') + ')' : '');
+      el.textContent = '📅 Duración: ' + texto;
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // HELPERS DOM / TOAST / RECARGA
+  // ══════════════════════════════════════════════════════════
+  function _setText(id, val) {
+    if (typeof window.campaniasSetText === 'function') {
+      window.campaniasSetText(id, val);
+      return;
+    }
+    var el = document.getElementById(id);
+    if (el) el.textContent = val != null ? val : '—';
+  }
+
+  function _setVal(id, val) {
+    if (typeof window.campaniasSetVal === 'function') {
+      window.campaniasSetVal(id, val);
+      return;
+    }
+    var el = document.getElementById(id);
+    if (el) el.value = val != null ? val : '';
+  }
+
+  function _getVal(id) {
+    if (typeof window.campaniasGetVal === 'function') {
+      return window.campaniasGetVal(id);
+    }
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  function _showToast(icon, msg) {
+    if (typeof window.campaniasShowToast === 'function') {
+      window.campaniasShowToast(icon, msg);
+      return;
+    }
+  }
+
+  function _reloadCampanias() {
+    if (typeof window.campaniasLoad === 'function') {
+      return window.campaniasLoad();
+    }
+    return Promise.resolve();
+  }
+
+})();
+</script>

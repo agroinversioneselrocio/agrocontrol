@@ -7,17 +7,15 @@ var CAMPANIAS_SHEET = 'campanias';
 var CAMPANIAS_ID    = 'campania_id';
 
 // ── LIST ─────────────────────────────────────────────────────
-function webAppListCampanias(args) {
+function listCampanias(args) {
   try {
     var a = _normalizeArgs(args || {});
     var data = getSheetData(CAMPANIAS_SHEET) || [];
 
-    // Excluir eliminados si usas borrado lógico
     data = data.filter(function(r) {
       return r.estado !== 'eliminado';
     });
 
-    // Filtro opcional por estado
     if (a.estado) {
       data = data.filter(function(r) {
         return String(r.estado || '') === String(a.estado);
@@ -29,7 +27,7 @@ function webAppListCampanias(args) {
       data: data
     };
   } catch (e) {
-    Logger.log('Error webAppListCampanias: ' + e.message);
+    Logger.log('Error listCampanias: ' + e.message);
     return {
       ok: false,
       message: e.message,
@@ -39,7 +37,7 @@ function webAppListCampanias(args) {
 }
 
 // ── GET ──────────────────────────────────────────────────────
-function webAppGetCampania(args) {
+function getCampania(args) {
   try {
     var a = _normalizeArgs(args || {});
     if (!a.id) {
@@ -65,7 +63,7 @@ function webAppGetCampania(args) {
       data: found
     };
   } catch (e) {
-    Logger.log('Error webAppGetCampania: ' + e.message);
+    Logger.log('Error getCampania: ' + e.message);
     return {
       ok: false,
       message: e.message,
@@ -75,7 +73,7 @@ function webAppGetCampania(args) {
 }
 
 // ── CREATE / UPDATE ──────────────────────────────────────────
-function webAppSaveCampania(args) {
+function saveCampania(args) {
   try {
     var a = _normalizeArgs(args || {});
     var ahora = new Date().toISOString();
@@ -128,7 +126,7 @@ function webAppSaveCampania(args) {
       data: nuevo
     };
   } catch (e) {
-    Logger.log('Error webAppSaveCampania: ' + e.message);
+    Logger.log('Error saveCampania: ' + e.message);
     return {
       ok: false,
       message: e.message,
@@ -138,7 +136,7 @@ function webAppSaveCampania(args) {
 }
 
 // ── DELETE ───────────────────────────────────────────────────
-function webAppDeleteCampania(args) {
+function deleteCampania(args) {
   try {
     var a = _normalizeArgs(args || {});
     if (!a.id) {
@@ -152,7 +150,7 @@ function webAppDeleteCampania(args) {
       data: null
     };
   } catch (e) {
-    Logger.log('Error webAppDeleteCampania: ' + e.message);
+    Logger.log('Error deleteCampania: ' + e.message);
     return {
       ok: false,
       message: e.message,

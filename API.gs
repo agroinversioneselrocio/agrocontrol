@@ -187,7 +187,9 @@ function webAppDeleteActividad(args) {
 
 function webAppListCampos(args) {
   try {
-    return getCampos();
+    var a    = _normalizeArgs(args);
+    var data = getCampos(a);
+    return data;
   } catch (e) {
     Logger.log('Error webAppListCampos: ' + e.message);
     return { ok: false, message: e.message, data: [] };
@@ -197,28 +199,188 @@ function webAppListCampos(args) {
 function webAppSaveCampo(args) {
   try {
     var a = _normalizeArgs(args);
-    if (a.campo_id) {
-      return updateCampo(a);
-    }
+    if (a.campo_id) return updateCampo(a);
     return createCampo(a);
   } catch (e) {
     Logger.log('Error webAppSaveCampo: ' + e.message);
-    return { ok: false, message: e.message, data: null };
+    return { ok: false, message: e.message };
   }
 }
 
 function webAppDeleteCampo(args) {
   try {
     var a = _normalizeArgs(args);
-    return deleteCampo(a);
+    if (!a.campo_id) return { ok: false, message: 'ID requerido.' };
+    return deleteCampo(a.campo_id);
   } catch (e) {
     Logger.log('Error webAppDeleteCampo: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+// ============================================================
+// PERSONAL
+// ============================================================
+
+function webAppListPersonal(args) {
+  try {
+    var a    = _normalizeArgs(args);
+    var data = getSheetData(CONFIG.HOJAS.PERSONAL) || [];
+    if (a.estado) {
+      data = data.filter(function(p) { return p.estado === a.estado; });
+    }
+    return { ok: true, data: data };
+  } catch (e) {
+    Logger.log('Error webAppListPersonal: ' + e.message);
+    return { ok: false, message: e.message, data: [] };
+  }
+}
+
+function webAppSavePersonal(args) {
+  try {
+    var a = _normalizeArgs(args);
+    return savePersonal(a);
+  } catch (e) {
+    Logger.log('Error webAppSavePersonal: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+function webAppDeletePersonal(args) {
+  try {
+    var a = _normalizeArgs(args);
+    if (!a.id) return { ok: false, message: 'ID requerido.' };
+    return deletePersonal(a.id);
+  } catch (e) {
+    Logger.log('Error webAppDeletePersonal: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+// ============================================================
+// INSUMOS
+// ============================================================
+
+function webAppListInsumos(args) {
+  try {
+    var a    = _normalizeArgs(args);
+    var data = getSheetData(CONFIG.HOJAS.INSUMOS) || [];
+    if (a.categoria) {
+      data = data.filter(function(i) { return i.categoria === a.categoria; });
+    }
+    return { ok: true, data: data };
+  } catch (e) {
+    Logger.log('Error webAppListInsumos: ' + e.message);
+    return { ok: false, message: e.message, data: [] };
+  }
+}
+
+function webAppSaveInsumo(args) {
+  try {
+    var a = _normalizeArgs(args);
+    return saveInsumo(a);
+  } catch (e) {
+    Logger.log('Error webAppSaveInsumo: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+function webAppDeleteInsumo(args) {
+  try {
+    var a = _normalizeArgs(args);
+    if (!a.id) return { ok: false, message: 'ID requerido.' };
+    return deleteInsumo(a.id);
+  } catch (e) {
+    Logger.log('Error webAppDeleteInsumo: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+function webAppRegistrarMovimiento(args) {
+  try {
+    var a = _normalizeArgs(args);
+    return registrarMovimiento(a);
+  } catch (e) {
+    Logger.log('Error webAppRegistrarMovimiento: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+function webAppListMovimientos(args) {
+  try {
+    var a    = _normalizeArgs(args);
+    var data = getSheetData(CONFIG.HOJAS.MOVIMIENTOS) || [];
+    if (a.insumo_id) {
+      data = data.filter(function(m) { return m.insumo_id === a.insumo_id; });
+    }
+    return { ok: true, data: data };
+  } catch (e) {
+    Logger.log('Error webAppListMovimientos: ' + e.message);
+    return { ok: false, message: e.message, data: [] };
+  }
+}
+
+// ============================================================
+// USUARIOS
+// ============================================================
+
+function webAppListUsuarios(args) {
+  try {
+    var data = getSheetData(CONFIG.HOJAS.USUARIOS) || [];
+    return { ok: true, data: data };
+  } catch (e) {
+    Logger.log('Error webAppListUsuarios: ' + e.message);
+    return { ok: false, message: e.message, data: [] };
+  }
+}
+
+function webAppSaveUsuario(args) {
+  try {
+    var a = _normalizeArgs(args);
+    return saveUsuario(a);
+  } catch (e) {
+    Logger.log('Error webAppSaveUsuario: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+function webAppDeleteUsuario(args) {
+  try {
+    var a = _normalizeArgs(args);
+    if (!a.usuario_id) return { ok: false, message: 'ID requerido.' };
+    return deleteUsuario(a.usuario_id);
+  } catch (e) {
+    Logger.log('Error webAppDeleteUsuario: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+function webAppChangePassword(args) {
+  try {
+    var a = _normalizeArgs(args);
+    return changePassword(a);
+  } catch (e) {
+    Logger.log('Error webAppChangePassword: ' + e.message);
+    return { ok: false, message: e.message };
+  }
+}
+
+// ============================================================
+// REPORTES
+// ============================================================
+
+function webAppGetReporte(args) {
+  try {
+    var a = _normalizeArgs(args);
+    return getReporte(a);
+  } catch (e) {
+    Logger.log('Error webAppGetReporte: ' + e.message);
     return { ok: false, message: e.message, data: null };
   }
 }
 
 // ============================================================
-// CAMPAÑAS
+// CAMPAÑAS  ← NUEVO
 // ============================================================
 
 function webAppListCampanias(args) {
